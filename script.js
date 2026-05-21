@@ -1,9 +1,57 @@
-/* ── MULTI-META: declarações (antes de qualquer uso) ── */
-const _META_KEYS = ["reserva_meta_v2", "reserva_meta_v2_b", "reserva_meta_v2_c"];
-const _META_MAX  = 3;
-let   _metaIdx   = 0;
+/*
+ * ============================================================
+ *  PLANÔVA — script.js
+ *  Lógica principal do planejamento financeiro.
+ *
+ *  ESTRUTURA GERAL:
+ *  1.  MULTI-META: chaves de localStorage e índice ativo
+ *  2.  BOTÕES X NAS LINHAS (limpar + subcategoria + replicar)
+ *  3.  SUBCATEGORIA: popup para detalhar uma despesa
+ *  4.  REPLICAR NOS PRÓXIMOS MESES: copia linha para N meses
+ *  5.  DETECTAR / RESOLVER CONFLITOS de duplicata
+ *  6.  CORES DOS BANCOS nos selects customizados
+ *  7.  DROPDOWN CUSTOMIZADO DE BANCOS (com busca e badge colorido)
+ *  8.  TOAST AVISO (orçamento estourado)
+ *  9.  POPUP COBRIR: usa saldo da reserva/meta para cobrir déficit
+ *  10. POPUP ALTERAR SALÁRIO: aviso ao diminuir com depósito ativo
+ *  11. UTILS: meses, anos, dropdowns, fmt, num, brl, pct
+ *  12. SALVAR / CARREGAR MÊS no localStorage
+ *  13. TROCA DE MÊS / ANO com animação
+ *  14. RECALC GERAL: soma todos os blocos e atualiza painel direito
+ *  15. RESERVA DE EMERGÊNCIA: saldo acumulado por movimentos
+ *  16. POPUP MOVIMENTO (depositar / retirar)
+ *  17. SISTEMA DE FILA DE TOASTS
+ *  18. BARRA DE PROGRESSO DAS METAS
+ *  19. MULTI-META: renderização em pilha, navegação, popup meta
+ *  20. REPLICAR MÊS INTEIRO
+ *  21. FECHAR / REABRIR MÊS (fechamento contábil)
+ *  22. POPUP COBRIR DÉFICIT com reserva/meta
+ *  23. CONFIGURAÇÕES (toggle de alerta de previsão)
+ *  24. EXPORTAR / IMPORTAR dados em JSON
+ *  25. PÁGINA DIÁRIO: tabela diária de gastos
+ *  26. TOUR GUIADO
+ *  27. SPLASH SCREEN
+ *  28. SIMULADOR ANUAL DE RESERVA
+ * ============================================================
+ */
 
-/* ── BOTÕES X NAS LINHAS ── */
+/* ── 1. MULTI-META: declarações globais ─────────────────────────────────
+ *  O sistema suporta até 3 metas simultâneas.
+ *  Cada meta é salva em uma chave separada do localStorage.
+ *  _metaIdx: índice (0-2) da meta atualmente visível no card principal.
+ * ────────────────────────────────────────────────────────────────────── */
+const _META_KEYS = ["reserva_meta_v2", "reserva_meta_v2_b", "reserva_meta_v2_c"];
+const _META_MAX  = 3;   // máximo de metas simultâneas
+let   _metaIdx   = 0;   // índice da meta ativa no painel
+
+/* ── 2. BOTÕES X NAS LINHAS ─────────────────────────────────────────────
+ *  Cada linha do orçamento recebe 3 botões injetados via JS (não estão no HTML):
+ *    • Subcategoria (tag): abre popup para nomear a despesa com mais detalhe
+ *    • Replicar (⟳): copia esta linha para os próximos N meses
+ *    • Limpar (×): apaga os campos da linha (com detecção de parcelas futuras)
+ *  A função adicionarBotoesLimpar() é chamada no DOMContentLoaded e depois
+ *  de qualquer operação que crie novas linhas.
+ * ────────────────────────────────────────────────────────────────────── */
 function atualizarLinhaPaga(linha) {
   const chk = linha.querySelector("input[type=checkbox]");
   if (chk) linha.classList.toggle("paga", chk.checked);
@@ -102,6 +150,21 @@ function adicionarBotoesLimpar() {
     linha.appendChild(btn);
   });
 }
+
+/* ── REVERTER COBERTURA ─────────────────────────────────────────────────
+ *  Quando o usuário limpa uma linha que causava déficit (e cuja cobertura
+ *  já havia sido sacada da reserva/meta), o sistema devolve o valor
+ *  de volta à reserva/meta automaticamente.
+ *  _reverterCoberturaMes() → reverte tudo; _reverterCoberturaParcial(max)
+ *  → reverte apenas até `max` reais.
+ * ────────────────────────────────────────────────────────────────────── */
+
+/* ── REVERTER COBERTURA ─────────────────────────────────────────────────
+ *  Quando o usuário limpa uma linha que causava déficit e cuja cobertura
+ *  já havia sido sacada da reserva/meta, o sistema devolve automaticamente.
+ *  _reverterCoberturaMes() → reverte tudo;
+ *  _reverterCoberturaParcial(max) → reverte apenas até `max` reais.
+ * ────────────────────────────────────────────────────────────────────── */
 
 /* ── APAGAR PARCELAS RESTANTES ── */
 let _apagarParcelasCtx = null;
@@ -213,6 +276,8 @@ function _limparLinha(linha, sel, val, chk) {
 }
 
 function detectarParcelasRestantes(bwIdx, lIdx, categoriaVal, valorVal, subVal) {
+  // Varre os próximos 11 meses no localStorage em busca de cópias idênticas desta linha.
+  // Retorna array de { p, mesIdx, anoIdx, nomeMes } para exibir no popup de confirmação.
   const encontradas = [];
   for (let p = 1; p <= 11; p++) {
     const totalMes = indice + p;
@@ -310,6 +375,19 @@ function resolverApagarParcelas(apagar) {
   fecharPopupApagarParcelas();
 }
 
+/* ── 3. SUBCATEGORIA ───────────────────────────────────────────────────
+ *  Cada linha pode ter uma "subcategoria" — um texto livre que detalha
+ *  a despesa (ex: "Financiamento da moto", "Plano família").
+ *  É salvo em linha._subcategoria (propriedade JS no elemento DOM)
+ *  e persistido junto com os demais dados da linha no localStorage.
+ *  O ícone de tag na linha fica colorido quando há subcategoria.
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── SUBCATEGORIA ──────────────────────────────────────────────────────
+ *  Cada linha pode ter uma "subcategoria" — texto livre que detalha a
+ *  despesa (ex: "Financiamento da moto"). Salvo em linha._subcategoria
+ *  e persistido no localStorage. O ícone de tag fica colorido com a cor
+ *  do banco quando há subcategoria.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── SUBCATEGORIA ── */
 let _subcategoriaLinha = null;
 let _subcategoriaBtnRef = null;
@@ -418,11 +496,26 @@ function limparSubcategoria() {
   fecharPopupSubcategoria();
 }
 
+/* ── 4. REPLICAR NOS PRÓXIMOS MESES ────────────────────────────────────
+ *  O botão ⟳ em cada linha abre um popup para selecionar quantos meses
+ *  à frente essa despesa deve ser repetida (1x a 6x, ou digitado manualmente).
+ *  O sistema detecta:
+ *    • Conflito de mesma linha (já existe — avisa, mas prossegue)
+ *    • Conflito em outra linha (possível duplicata — pede confirmação)
+ *  Os dados são gravados diretamente no localStorage de cada mês-alvo.
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── REPLICAR NOS PRÓXIMOS MESES ───────────────────────────────────────
+ *  O botão ⟳ em cada linha replica a despesa para N meses à frente.
+ *  O sistema detecta conflitos (mesma categoria+valor em outra linha)
+ *  e pede confirmação antes de sobrescrever ou adicionar em paralelo.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── REPLICAR NOS PRÓXIMOS MESES ── */
 let _replicarLinha = null;
 let _replicarParcelas = 0;
 
 function getLinhaBlocoIndex(linha) {
+  // Mapeia um elemento .linha DOM para os índices bwIdx (bloco-wrap) e lIdx (linha dentro do bloco).
+  // Usados como chave no localStorage: bw0_l2_sel, bw0_l2_val etc.
   // Retorna { bwIdx, lIdx } para identificar a linha no localStorage
   let bwIdx = -1, lIdx = -1;
   document.querySelectorAll(".bloco-wrap").forEach((bw, bi) => {
@@ -714,6 +807,15 @@ function executarReplicar(bwIdx, lIdx, bancoVal, valorVal, chkVal, subVal, meses
   setTimeout(() => feedbackEl.remove(), 2800);
 }
 
+/* ── 5. POPUP DE CONFLITO ──────────────────────────────────────────────
+ *  Exibido quando o usuário tenta replicar uma linha e há outra linha
+ *  num mês futuro com a mesma categoria E valor (possível duplicata).
+ *  O usuário escolhe: "Adicionar" (mantém ambas) ou "Substituir" (sobrescreve).
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── POPUP DE CONFLITO ─────────────────────────────────────────────────
+ *  Exibido quando há possível duplicata ao replicar.
+ *  Opções: "Adicionar" (mantém ambas) ou "Substituir" (sobrescreve).
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── POPUP DE CONFLITO ── */
 let _conflitoCtx = null;
 
@@ -776,6 +878,15 @@ function resolverConflito(modo) {
   executarReplicar(bwIdx, lIdx, bancoVal, valorVal, chkVal, subVal, mesesParaReplicar, modo, conflitos);
 }
 
+/* ── 6. CORES DOS BANCOS ───────────────────────────────────────────────
+ *  Mapa de cor de fundo e cor de texto para cada banco/categoria.
+ *  Usado para colorir o select customizado quando uma opção é escolhida.
+ *  Categorias de residência (Internet, Água etc.) usam azul-petróleo (#215a6c).
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── CORES DOS BANCOS ───────────────────────────────────────────────────
+ *  Mapa banco → { bg, color } para colorir o select customizado.
+ *  Categorias de residência (Internet, Água etc.) = azul-petróleo #215a6c.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── CORES DOS BANCOS NOS SELECTS DE CARTÃO ── */
 const coresBancos = {
   "Nubank":         { bg: "#8A05BE", color: "#fff" },
@@ -818,6 +929,21 @@ function inicializarCoresBancos() {
 }
 
 
+/* ── 7. DROPDOWN CUSTOMIZADO DE BANCOS ─────────────────────────────────
+ *  O <select> nativo é ocultado e substituído por um div customizado.
+ *  Motivo: exibir badges coloridos com o logo do banco selecionado.
+ *  A lista dropdown é appendada ao <body> (não ao pai) para escapar de
+ *  qualquer overflow:hidden nos ancestrais.
+ *  Referências importantes no DOM:
+ *    selectOriginal._customDisplay → div visível (badge colorido)
+ *    display._list                 → ul dropdown
+ *    display._clearBtn             → botão ×
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── DROPDOWN CUSTOMIZADO DE BANCOS ────────────────────────────────────
+ *  O <select> nativo é ocultado e substituído por um div com badge colorido.
+ *  A lista é appendada ao <body> para escapar de overflow:hidden.
+ *  selectOriginal._customDisplay → div badge; display._clearBtn → botão ×
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── DROPDOWN CUSTOMIZADO BANCOS ── */
 const bancosResidencia = ["Selecione","Internet","Água","Energia","Aluguel","Financiamento","Condomínio","IPTU"];
 const bancosCartao = ["Selecione","Banco do Brasil","Banco PAN","Bradesco","BTG Pactual","C6 Bank","Caixa","Inter","Itaú","Mercado Pago","Nubank","Original","PagBank","Picpay","Santander","Sicredi"];
@@ -1040,6 +1166,19 @@ function sincronizarDropdownsBancos() {
 }
 
 
+/* ── 8. TOAST AVISO (ORÇAMENTO ESTOURADO) ──────────────────────────────
+ *  Exibido automaticamente quando a previsão de saldo fica negativa.
+ *  Fica no topo-direito da tela. Tem um timer visual de barra.
+ *  Se o usuário já tem saldo em reserva/meta, exibe botão "Usar saldo"
+ *  que abre o popup de cobertura de déficit.
+ *  _toastJaExibidoParaEsteSalario evita re-exibição enquanto o salário
+ *  não mudar (evita spam ao editar campos).
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── TOAST AVISO (ORÇAMENTO ESTOURADO) ─────────────────────────────────
+ *  Exibido quando a previsão de saldo fica negativa.
+ *  Se há saldo em reserva/meta, exibe botão "Usar saldo".
+ *  _toastJaExibidoParaEsteSalario: evita re-exibição enquanto salário não mudar.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── TOAST AVISO ── */
 let toastAvisoAtivo = false;
 let _toastTimer = null;
@@ -1109,6 +1248,10 @@ function fecharToastAviso(porAcao = false) {
 function exibirPopupAviso() { exibirToastAviso(); }
 function fecharPopupAviso()  { fecharToastAviso(true); }
 
+/* ── BOTÃO NO TOOLTIP DO TRIÂNGULO (!) ─────────────────────────────────
+ *  O ícone (!) no painel direito tem um tooltip com botão "Usar reserva".
+ *  Só aparece quando há déficit E saldo disponível em reserva/meta.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── BOTÃO NO TOOLTIP DO TRIÂNGULO ── */
 function _atualizarBotaoTooltip() {
   const btn = document.getElementById("aviso-tooltip-btn");
@@ -1166,6 +1309,21 @@ function atualizarBotaoCobrirToast() {
   btn.style.display = (deficit > 0 && (temReserva || temMeta)) ? "inline-flex" : "none";
 }
 
+/* ── 9. POPUP COBRIR DÉFICIT ────────────────────────────────────────────
+ *  Permite ao usuário sacar da reserva e/ou meta para cobrir um déficit
+ *  no mês atual. Regra: só disponível se todos os meses ANTERIORES
+ *  estiverem fechados (fechamento contábil).
+ *  O valor sacado é registrado como "cobrir-deficit" nos movimentos e
+ *  rastreado em localStorage("cobrir_valor_ANO_MES").
+ *  Se os gastos diminuírem depois, o excedente é devolvido automaticamente
+ *  em _reverterCoberturaParcial().
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── POPUP COBRIR DÉFICIT ───────────────────────────────────────────────
+ *  Saca da reserva/meta para cobrir déficit do mês.
+ *  Requer fechamento de todos os meses anteriores.
+ *  Valor sacado → registrado como "cobrir-deficit" nos movimentos.
+ *  Se gastos diminuírem depois, excedente é devolvido automaticamente.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── POPUP COBRIR ── */
 let _cobrirSelecionadas = new Set(); // ids selecionados
 
@@ -1375,6 +1533,16 @@ function atualizarAvisoIcone(mostrar) {
   }
 }
 
+/* ── 10. POPUP ALTERAR SALÁRIO ──────────────────────────────────────────
+ *  Se o usuário diminui o salário e já há depósitos na reserva/meta
+ *  que não caberiam no novo saldo, o sistema pede confirmação.
+ *  Ao confirmar, os depósitos manuais deste mês são revertidos e o
+ *  recalc é executado com o novo salário.
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── POPUP ALTERAR SALÁRIO ──────────────────────────────────────────────
+ *  Ao diminuir o salário com depósitos ativos que não caberiam no novo
+ *  saldo, pede confirmação. Ao confirmar, depósitos deste mês são revertidos.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── POPUP ALTERAR SALÁRIO COM DEPÓSITO NO MÊS ── */
 let _alterarSalarioPendente = false;
 let _salarioAnterior = { sal1: "", sal2: "" };
@@ -1565,6 +1733,27 @@ function confirmarAlterarSalario() {
   _executarAlteracaoSalario();
 }
 
+/* ── 11. UTILS — DATAS, FORMATAÇÃO E DROPDOWNS ─────────────────────────
+ *  meses[]: array dos nomes dos meses (0=Janeiro...11=Dezembro)
+ *  anos[]:  anos disponíveis no sistema (2026–2030)
+ *  anoAtual / indice: estado global da tela — qual mês/ano está visível
+ *  fmt(input): formata o input como "R$ 0,00" ao perder foco
+ *  fmtInput(input): formata em tempo real preservando o cursor
+ *  num(str): converte "R$ 1.234,56" → 1234.56
+ *  brl(n): converte 1234.56 → "R$ 1.234,56"
+ *  pct(n): converte 12.5 → "12,50%"
+ *
+ *  LIMITES:
+ *    ANO_MIN = 2026 / MES_MIN = 0  (Janeiro 2026)
+ *    ANO_MAX = 2030 / MES_MAX = 11 (Dezembro 2030)
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── UTILS: DATAS, FORMATAÇÃO E DROPDOWNS ──────────────────────────────
+ *  meses[] / anos[]: listas de nomes e anos disponíveis (2026-2030)
+ *  anoAtual / indice: estado global da tela
+ *  fmt() → formata no blur | fmtInput() → formata em tempo real
+ *  num(str) → "R$ 1.234,56" para 1234.56 | brl(n) → inverso | pct(n) → "%"
+ *  LIMITES: Janeiro 2026 (ANO_MIN/MES_MIN) → Dezembro 2030 (ANO_MAX/MES_MAX)
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── UTILS ── */
 const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 let indice = new Date().getMonth();
@@ -1754,8 +1943,29 @@ function getInputs() {
   ];
 }
 
+/* ── 12. SALVAR / CARREGAR MÊS ──────────────────────────────────────────
+ *  Chave no localStorage: "planejamento_ANO_MES"  (ex: "planejamento_2026_0")
+ *  Estrutura salva:
+ *    { sal1, sal2,
+ *      bw0_l0_sel, bw0_l0_val, bw0_l0_chk, bw0_l0_sub,
+ *      bw0_l1_sel, ... }
+ *  bwX = índice do bloco-wrap (.bloco-wrap); lX = índice da linha dentro dele.
+ *
+ *  salvarMes()    → grava estado atual (bloqueado se mês fechado ou em animação)
+ *  carregarMes()  → restaura estado do localStorage e chama recalc()
+ *  agendarSalvoComFeedback() → debounce de 3s, exibe "✓ Salvo" depois
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── SALVAR / CARREGAR MÊS ──────────────────────────────────────────────
+ *  Chave: "planejamento_ANO_MES" (ex: "planejamento_2026_0")
+ *  Estrutura: { sal1, sal2, bw0_l0_sel, bw0_l0_val, bw0_l0_chk, bw0_l0_sub, ... }
+ *  bwX = índice do .bloco-wrap; lX = índice da .linha dentro dele.
+ *  salvarMes() → bloqueado se mês fechado ou em animação de troca.
+ *  carregarMes() → restaura campos + chama recalc() + sincroniza dropdowns.
+ *  agendarSalvoComFeedback() → debounce 3s, exibe "✓ Salvo" na topnav.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── SALVA dados do mês atual no LocalStorage ── */
 function salvarMes() {
+  // Impede gravação se o mês está bloqueado ou se a animação de troca está rodando
   if (mesFechado(anoAtual, indice)) return; // mês fechado — não permite alteração
   if (_indiceVisual !== null) return;        // tela em transição — campos foram limpos, não salva
   const chave = "planejamento_" + anoAtual + "_" + indice;
@@ -1846,6 +2056,21 @@ function carregarMes() {
   }
 }
 
+/* ── 13. TROCA DE MÊS / ANO ────────────────────────────────────────────
+ *  changeMonth(d): avança (d=+1) ou recua (d=-1) o mês/ano.
+ *  Usa animação de flash (animarTroca) para esconder a limpeza dos campos
+ *  antes de carregar os dados do novo mês — o usuário nunca vê os campos
+ *  zerados.
+ *  _indiceVisual: enquanto a animação está ativa, salvarMes() é bloqueado
+ *  para evitar gravar campos zerados.
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── TROCA DE MÊS / ANO ────────────────────────────────────────────────
+ *  changeMonth(d): avança (+1) ou recua (-1) um mês.
+ *  Usa flash animado (animarTroca) para esconder a limpeza dos campos —
+ *  o usuário nunca vê os campos zerados.
+ *  _indiceVisual !== null indica que a tela está em transição: salvarMes()
+ *  é bloqueado para evitar gravar os campos zerados.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── TROCA DE MÊS: salva o atual, carrega o novo ── */
 let _changeMonthDebounce = null;
 let _changeMonthPendente = 0;
@@ -2013,6 +2238,32 @@ function verificarDuplicataLinha(inputVal) {
   // Validação movida para confirmarSubcategoria
 }
 
+/* ── 14. GAVETA DE TOTAL DO BLOCO ──────────────────────────────────────
+ *  Ao clicar no valor ao lado do título do bloco (ex: "R$ 450,00"),
+ *  aparece um painel tipo gaveta mostrando o subtotal detalhado.
+ *  Fecha automaticamente após 5s.
+ * ────────────────────────────────────────────────────────────────────── */
+
+/* ── 14b. RECALC GERAL ──────────────────────────────────────────────────
+ *  Chamado sempre que qualquer valor muda na tela.
+ *  Fluxo:
+ *    1. Soma cada bloco (Residência, Cartões, Outros) das 2 colunas
+ *    2. Calcula subtotais e atualiza os círculos de progresso
+ *    3. Calcula previsão de saldo = salário - gastos - ajuste (depósitos)
+ *    4. Se há cobertura ativa e o déficit diminuiu, reverte o excedente
+ *    5. Atualiza cards "Previsão de Saldo" e "Previsão de Gastos"
+ *    6. Exibe/esconde ícone de aviso (!) se saldo negativo
+ *    7. Verifica alerta de previsão configurado pelo usuário
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── GAVETA DE TOTAL DO BLOCO ──────────────────────────────────────────
+ *  Ao clicar no valor ao lado do título do bloco, abre um painel tipo
+ *  gaveta com o subtotal. Fecha automaticamente após 5s.
+ *
+ * ── RECALC GERAL ─────────────────────────────────────────────────────
+ *  Chamado sempre que qualquer valor muda.
+ *  Fluxo: soma blocos → subtotais → previsão de saldo → atualiza cards
+ *         → verifica cobertura ativa → exibe/esconde ícone de aviso (!)
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── GAVETA DE TOTAL DO BLOCO ── */
 const _gavetaTimers = {};
 
@@ -2046,6 +2297,8 @@ function toggleBlocoValor(totId) {
 }
 
 function recalc(fromSalary = false, fromUser = false){
+  // fromSalary: true quando chamado ao confirmar salário → força toast de aviso
+  // fromUser:   true quando o usuário editou algo → agenda salvo com feedback
   // Blocos coluna 1
   const colunas = document.querySelectorAll(".coluna-wrapper");
   const blocos1 = colunas[0] ? colunas[0].querySelectorAll(".bloco-wrap") : [];
@@ -2070,6 +2323,8 @@ function recalc(fromSalary = false, fromUser = false){
   document.getElementById("sal-total").value = totalSal > 0 ? brl(totalSal) : "";
 
   // Atualiza barra de progresso dos subtotais
+  // Atualiza a barra circular SVG (stroke-dashoffset) proporcional ao gasto vs salário.
+  // Fica vermelha quando > 90% do salário está comprometido.
   function _atualizarProgressoSubtotal(ringId, subtotal, salario) {
     const ring = document.getElementById(ringId);
     if (!ring) return;
@@ -2152,6 +2407,24 @@ function somaColBloco(id, blocoWrap){
 }
 
 
+/* ── 15. RESERVA DE EMERGÊNCIA ─────────────────────────────────────────
+ *  Chave: localStorage("reserva_saldo_v1") → { saldo, movimentos[] }
+ *  Cada movimento: { acao: "depositar"|"retirar", valor, data, mes, ano, origem? }
+ *  origem: "cobrir-deficit" → saque automático para cobrir déficit
+ *          "cobrir-deficit-estorno" → devolução ao diminuir gastos
+ *          undefined → movimento manual do usuário
+ *
+ *  calcularSaldoAteMes(movs, ano, mes) → saldo acumulado até aquele mês
+ *  calcularSaldoDisponivelParaSaque()  → considera saques em meses FUTUROS
+ *    que já consumiram o saldo — bloqueia retirada se não sobrar nada
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── RESERVA DE EMERGÊNCIA ─────────────────────────────────────────────
+ *  Chave: "reserva_saldo_v1" → { saldo, movimentos[] }
+ *  movimento: { acao, valor, data, mes, ano, origem? }
+ *  origem: undefined = manual | "cobrir-deficit" = automático
+ *  calcularSaldoAteMes(): saldo até o mês visualizado
+ *  calcularSaldoDisponivelParaSaque(): desconta saques de meses futuros
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── RESERVA DE EMERGÊNCIA — SALDO ACUMULADO ── */
 
 function carregarSaldoReserva() {
@@ -2164,6 +2437,8 @@ function salvarSaldoReserva(dados) {
 }
 
 function calcularSaldoAteMes(movimentos, ano, mes) {
+  // Soma todos os movimentos com data <= (ano, mes).
+  // Usado para mostrar o saldo acumulado até o mês visualizado.
   let saldo = 0;
   (movimentos || []).forEach(m => {
     if (m.ano === undefined || m.mes === undefined) return;
@@ -2235,10 +2510,36 @@ function atualizarDisplayReserva() {
   el.style.color = saldo > 0 ? "#1f7a1f" : "#1a2a5e";
 }
 
+/* ── 16. POPUP MOVIMENTO (DEPOSITAR / RETIRAR) ──────────────────────────
+ *  Abre ao clicar nos botões "+ Depositar" / "− Retirar" no card de
+ *  Reserva ou Meta. Validações:
+ *    • Depósito: limitado à previsão de saldo disponível no mês
+ *    • Retirada: requer fechamento de todos os meses anteriores;
+ *                limitada ao saldoDisponível (descontando retiradas futuras)
+ *  O movimento é salvo nos movimentos[] da reserva/meta e um ajuste é
+ *  registrado em "mov_previsao_ANO_MES" para refletir na previsão de saldo.
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── POPUP MOVIMENTO (DEPOSITAR / RETIRAR) ──────────────────────────────
+ *  Depósito: limitado à previsão de saldo disponível no mês.
+ *  Retirada: requer fechamento de meses anteriores; limitada ao saldo
+ *    disponível descontando retiradas em meses futuros.
+ *  O movimento é salvo nos movimentos[] e registrado em mov_previsao_ANO_MES.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── POPUP MOVIMENTO (depositar / retirar) ── */
 let _movimentoTipo   = ""; // 'reserva' ou 'meta'
 let _movimentoAcao   = ""; // 'depositar' ou 'retirar'
 
+/* ── 17. SISTEMA DE FILA DE TOASTS ─────────────────────────────────────
+ *  Dois tipos de toast:
+ *    exibirToastSaldo(msg): toast vermelho no canto superior-direito,
+ *      empilha se já houver outro ativo — cada um tem barra de progresso
+ *    exibirToastInfo(msg): toast azul centralizado no fundo, sobrescreve
+ *      o anterior (usado para confirmações de ação bem-sucedida)
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── SISTEMA DE FILA DE TOASTS ─────────────────────────────────────────
+ *  exibirToastSaldo(msg): toast vermelho superior-direito, empilhável
+ *  exibirToastInfo(msg):  toast azul centralizado no fundo, substitui anterior
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── SISTEMA DE FILA DE TOASTS ── */
 const _toastQueue = [];
 const TOAST_GAP = 12; // espaço entre toasts em px
@@ -2605,7 +2906,9 @@ function confirmarMovimento() {
   recalc();
 }
 
-// Armazena o ajuste do mês atual para o cálculo da previsão de saldo
+// Armazena o ajuste do mês atual para o cálculo da previsão de saldo.
+// delta positivo = depósito (reduz previsão); delta negativo = retirada (aumenta previsão).
+// A fórmula em recalc() é: previsão = salário - gastos - ajuste
 function aplicarMovimentoPrevisao(delta) {
   const chave = "mov_previsao_" + anoAtual + "_" + indice;
   const atual = parseFloat(localStorage.getItem(chave) || "0");
@@ -2618,6 +2921,15 @@ function getMovimentoPrevisao() {
   return parseFloat(localStorage.getItem(chave) || "0");
 }
 
+/* ── 18. BARRA DE PROGRESSO DA META ────────────────────────────────────
+ *  Exibida no card de meta no painel direito.
+ *  Cores da barra: cinza (< 40%) → amarelo (40-80%) → verde (> 80%) → completo (100%)
+ *  atualizarBarraReserva(): recarrega dados da meta ativa (_metaIdx) e renderiza
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── BARRA DE PROGRESSO DA META ────────────────────────────────────────
+ *  Cores: cinza < 40% → amarelo 40-80% → verde > 80% → completo 100%.
+ *  atualizarBarraReserva() recarrega dados da meta ativa e re-renderiza.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── BARRA DE PROGRESSO META ── */
 function _renderizarMetaComSaldo(dados) {
   const meta  = dados ? num(dados.valor) : 0;
@@ -2661,6 +2973,24 @@ function atualizarBarraReserva() {
   _renderizarMetaComSaldo({ ...dados, saldoAcumulado: brl(saldo) });
 }
 
+/* ── 19. MULTI-META (3 SLOTS FIXOS) ────────────────────────────────────
+ *  Até 3 metas simultâneas, cada uma em um slot (0, 1, 2) do localStorage.
+ *  _metasPreenchidas(): lista metas ativas + "fantasmas" (metas excluídas
+ *    que ainda devem aparecer em meses anteriores à exclusão).
+ *  _renderizarPilha(): renderiza o card principal (meta ativa) e os cards
+ *    de fundo (s1, s2), pontinhos de navegação e botões prev/next.
+ *  Clicar em um card de fundo anima o card principal vindo de baixo.
+ *
+ *  Chaves de "fantasma": "meta_excluida_v2_0", "_1", "_2"
+ *    → mantém histórico de metas deletadas para exibição em meses passados
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── MULTI-META (3 SLOTS FIXOS) ────────────────────────────────────────
+ *  Até 3 metas simultâneas em slots 0, 1, 2 do localStorage.
+ *  "Fantasmas": metas excluídas que aparecem em meses anteriores à exclusão.
+ *    Chave: "meta_excluida_v2_0/1/2"
+ *  _renderizarPilha(): renderiza card principal + cards de fundo (s1/s2)
+ *    + pontinhos. Clicar num card de fundo anima a troca.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── MULTI-META (3 slots fixos) ── */
 
 function _metaKey(idx) { return _META_KEYS[idx ?? _metaIdx]; }
@@ -3182,6 +3512,16 @@ function _migrarDatasCriacao() {
   });
 }
 
+/* ── 20. REPLICAR MÊS INTEIRO ──────────────────────────────────────────
+ *  Copia todos os lançamentos do mês atual para os próximos N meses.
+ *  Se algum mês-alvo já tem dados, exibe popup perguntando:
+ *    "Manter" → preenche apenas meses vazios (preserva salário dos destinos)
+ *    "Sobrescrever" → substitui tudo nos meses-alvo
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── REPLICAR MÊS INTEIRO ──────────────────────────────────────────────
+ *  Copia todos os lançamentos do mês atual para N meses à frente.
+ *  Se mês-alvo já tem dados: "Manter" (só preenche vazios) ou "Sobrescrever".
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── REPLICAR MÊS INTEIRO ── */
 let _replicarMesQtd = 0;
 // Dados salvos para uso no popup de confirmação
@@ -3350,6 +3690,24 @@ function _fazerReplicarMes(modo) {
 function replicarMesSobrescrever() { _fazerReplicarMes("sobrescrever"); }
 function replicarMesManter()       { _fazerReplicarMes("manter"); }
 
+/* ── INICIALIZAÇÃO ──────────────────────────────────────────────────────
+ *  Executado quando o HTML termina de carregar.
+ *  Ordem de inicialização:
+ *    1. _migrarDatasCriacao()   → garante que metas legadas tenham criadoAno/Mes
+ *    2. adicionarBotoesLimpar() → injeta botões em cada .linha do HTML
+ *    3. inicializarCoresBancos()→ substitui <select>s por dropdowns coloridos
+ *    4. inicializarDropdownsMeta() → configura dropdowns do popup de meta
+ *    5. carregarMes()           → restaura dados do mês atual do localStorage
+ *    6. carregarMetaReserva()   → renderiza pilha de metas
+ *    7. atualizarBarraReserva() → preenche barra de progresso
+ *    8. atualizarDisplayReserva()→ atualiza saldo da reserva
+ *    9. _inicializarIconePrevisao()→ configura tooltip do ícone de % do card
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── INICIALIZAÇÃO ──────────────────────────────────────────────────────
+ *  Ordem: migrarDatas → botoesLimpar → coresBancos → dropdownsMeta
+ *         → carregarMes → metaReserva → barraReserva → displayReserva
+ *         → iconePrevisao
+ * ────────────────────────────────────────────────────────────────────── */
 window.addEventListener("DOMContentLoaded", function() {
   _migrarDatasCriacao();
   adicionarBotoesLimpar();
@@ -3408,6 +3766,23 @@ document.addEventListener("visibilitychange", function() {
     salvarMes();
   }
 });
+/* ── 23. CONFIGURAÇÕES (ENGRENAGEM) ────────────────────────────────────
+ *  Popup que abre via botão de engrenagem no FAB inferior-esquerdo.
+ *  Permite configurar:
+ *    • Alerta de previsão: notifica quando saldo previsto cai abaixo de X%
+ *    • Coloração da previsão: destaca o card em vermelho quando em alerta
+ *  Estados salvos em localStorage: "cfg_alerta_economia", "cfg_alerta_pct",
+ *  "cfg_alerta_cor".
+ *  Configurações do Diário (popup separado):
+ *    • Toggle: usa previsão de saldo como limite mensal OU valor manual
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── CONFIGURAÇÕES (ENGRENAGEM) ────────────────────────────────────────
+ *  Alerta de previsão: notifica quando saldo previsto < X% da receita.
+ *  Coloração: destaca o card em vermelho no alerta.
+ *  Estados: "cfg_alerta_economia", "cfg_alerta_pct", "cfg_alerta_cor".
+ *  Config Diário: toggle que determina se limite mensal vem da previsão
+ *    de saldo ou de valor manual (salvo em "diario_limite_mensal_ativo").
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── CONFIGURAÇÕES (engrenagem) ── */
 let _configAberto = false;
 let _alertaPrevisaoAtivo = JSON.parse(localStorage.getItem("cfg_alerta_economia") || "false"); // chave localStorage mantida para não perder dados salvos
@@ -3710,6 +4085,26 @@ function _verificarAlertaPrevisao(previsaoPct, totalSal) {
 }
 
 
+/* ── 21. FECHAR / REABRIR MÊS (FECHAMENTO CONTÁBIL) ─────────────────────
+ *  Chave no localStorage: "mes_fechado_ANO_MES" → "1" se fechado
+ *
+ *  Regras de fechamento:
+ *    • Só pode fechar sequencialmente (não pode pular meses)
+ *    • Ao fechar, todos os meses anteriores em aberto são fechados em cascata
+ *    • Mês fechado → body.classList.add("mes-fechado") → CSS bloqueia edição
+ *    • Para sacar da reserva/meta, TODOS os meses anteriores precisam estar fechados
+ *
+ *  Reabertura: remove a chave do localStorage (não apaga dados)
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── FECHAR / REABRIR MÊS (FECHAMENTO CONTÁBIL) ────────────────────────
+ *  Chave: "mes_fechado_ANO_MES" → "1" se fechado.
+ *  Regras:
+ *    • Só pode fechar sequencialmente (jan, fev, mar...)
+ *    • Ao fechar, todos os anteriores em aberto fecham em cascata
+ *    • body.classList.add("mes-fechado") → CSS bloqueia inputs/buttons
+ *    • Sacar reserva/meta exige todos os anteriores fechados
+ *  Reabertura: remove a chave (dados preservados).
+ * ────────────────────────────────────────────────────────────────────── */
 /* ══════════════════════════════════════════════════════
    FECHAR / REABRIR MÊS
    Chave: "mes_fechado_AAAA_M" → "1" se fechado
@@ -3980,6 +4375,22 @@ function confirmarReabrirMes() {
   exibirToastInfo(meses[indice] + " reaberto. Edições liberadas.", 4000);
 }
 
+/* ── 24. EXPORTAR / IMPORTAR DADOS ─────────────────────────────────────
+ *  exportarDados(): cria um arquivo JSON com todas as chaves relevantes
+ *    do localStorage e força download no navegador.
+ *    Prefixos exportados: planejamento_, mov_previsao_, cobrir_valor_,
+ *    dep_reserva_, dep_meta_, mes_fechado_, diario_, simulador_reserva_,
+ *    reserva_saldo_v1, reserva_meta_v2*, cfg_*
+ *  importarDados(input): lê o .json, mostra popup de confirmação e
+ *    substitui TODOS os dados atuais (ação irreversível).
+ *    A flag _importacaoEmAndamento impede que o beforeunload grave
+ *    os campos zerados durante a importação.
+ * ────────────────────────────────────────────────────────────────────── */
+/* ── EXPORTAR / IMPORTAR DADOS ─────────────────────────────────────────
+ *  exportarDados(): JSON com todas as chaves relevantes → download no browser.
+ *  importarDados(): lê .json, pede confirmação e substitui TUDO (irreversível).
+ *  _importacaoEmAndamento: bloqueia beforeunload durante a importação.
+ * ────────────────────────────────────────────────────────────────────── */
 /* ── EXPORTAR / IMPORTAR DADOS ── */
 
 function exportarDados() {
@@ -4930,7 +5341,222 @@ function _tourSimularDropdownComSelecao(blocoId, itens, itemSelecionado) {
 
 const _tourPassos = [
 
-  // ── 1. SALÁRIO 1 ──
+  // ── 0. INTRODUÇÃO MENSAL ──
+  {
+    alvo: 'btn-dados',
+    titulo: 'Página Mensal',
+    desc: 'Este é seu painel de planejamento. Antes do mês começar, você informa seu salário e já prevê todos os gastos fixos — aluguel, cartões, contas. O sistema calcula automaticamente quanto vai sobrar, te dando uma visão clara do mês antes mesmo de ele acontecer.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const svg = document.getElementById('tour-overlay');
+      svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      _esconderBalao();
+      _tourTimeout(function() {
+        const balao = document.getElementById('tour-balao');
+        if (balao) {
+          const z = _getCssZoom();
+          balao.style.left = (window.innerWidth / z / 2 - balao.offsetWidth / 2) + 'px';
+          balao.style.top  = (window.innerHeight / z / 2 - balao.offsetHeight / 2) + 'px';
+        }
+        _mostrarBalao();
+      }, 160);
+    },
+    onSair: function() { _clearTourTimers(); }
+  },
+
+  // ── 1. BOTÃO DE DADOS ──
+  {
+    alvo: 'btn-dados',
+    titulo: 'Seus dados ficam aqui',
+    desc: 'Este botão abre o menu de backup. Seus dados ficam salvos somente neste navegador, então é importante baixar e guardar o arquivo de backup sempre que limpar o cache, usar outro navegador ou trocar de computador.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const svg  = document.getElementById('tour-overlay');
+      const mask = svg.querySelector('#tour-mask');
+      const ns   = 'http://www.w3.org/2000/svg';
+      svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      _esconderBalao();
+
+      const btn = document.getElementById('btn-dados');
+      if (!btn) { _mostrarBalao(); return; }
+
+      _tourTimeout(function() {
+        const z = _getCssZoom();
+        const r = btn.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) { _mostrarBalao(); return; }
+
+        const pad = 10;
+        const x = r.left / z - pad, y = r.top / z - pad;
+        const w = r.width / z + pad * 2, h = r.height / z + pad * 2;
+
+        svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+
+        const hole = document.createElementNS(ns, 'ellipse');
+        hole.setAttribute('cx', x + w/2); hole.setAttribute('cy', y + h/2);
+        hole.setAttribute('rx', w/2);     hole.setAttribute('ry', h/2);
+        hole.setAttribute('fill', 'black');
+        hole.classList.add('tour-dyn');
+        mask.appendChild(hole);
+
+        const border = document.createElementNS(ns, 'ellipse');
+        border.setAttribute('cx', x + w/2); border.setAttribute('cy', y + h/2);
+        border.setAttribute('rx', w/2 + 2); border.setAttribute('ry', h/2 + 2);
+        border.setAttribute('fill', 'none');
+        border.setAttribute('stroke', 'rgba(58,110,220,0.85)');
+        border.setAttribute('stroke-width', '2.5');
+        border.classList.add('tour-dyn');
+        svg.appendChild(border);
+
+        btn.style.transition = 'transform 0.35s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.35s';
+        btn.style.transform  = 'scale(1.18)';
+        btn.style.boxShadow  = '0 0 0 6px rgba(58,110,220,0.18)';
+        _tourTimeout(function() {
+          btn.style.transform = 'scale(1)';
+          btn.style.boxShadow = '';
+        }, 420);
+
+        _posicionarBalao([btn]);
+      }, 200);
+    },
+    onSair: function() {
+      _clearTourTimers();
+      const btn = document.getElementById('btn-dados');
+      if (btn) { btn.style.transition = ''; btn.style.transform = ''; btn.style.boxShadow = ''; }
+    }
+  },
+
+  // ── 2. EXPORTAR DADOS ──
+  {
+    alvo: 'btn-dados',
+    titulo: 'Exportar dados',
+    desc: 'Clique em “Exportar dados” para baixar um arquivo com todo o seu histórico. Guarde esse arquivo em um lugar seguro, pois ele serve como backup e permite recuperar suas informações caso você troque de navegador, limpe o cache ou use outro dispositivo.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const svg  = document.getElementById('tour-overlay');
+      const mask = svg.querySelector('#tour-mask');
+      const ns   = 'http://www.w3.org/2000/svg';
+      svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      _esconderBalao();
+
+      _abrirDadosMenuTour();
+
+      _tourTimeout(function() {
+        const btn = document.getElementById('btn-exportar-dados');
+        if (!btn) { _mostrarBalao(); return; }
+
+        const z = _getCssZoom();
+        const r = btn.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) { _mostrarBalao(); return; }
+
+        svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+
+        const pad = 6;
+        const x = r.left / z - pad, y = r.top / z - pad;
+        const w = r.width / z + pad * 2, h = r.height / z + pad * 2;
+
+        const hole = document.createElementNS(ns, 'rect');
+        hole.setAttribute('x', x); hole.setAttribute('y', y);
+        hole.setAttribute('width', w); hole.setAttribute('height', h);
+        hole.setAttribute('rx', '9');
+        hole.setAttribute('fill', 'black');
+        hole.classList.add('tour-dyn');
+        mask.appendChild(hole);
+
+        const border = document.createElementNS(ns, 'rect');
+        border.setAttribute('x', x); border.setAttribute('y', y);
+        border.setAttribute('width', w); border.setAttribute('height', h);
+        border.setAttribute('rx', '9');
+        border.setAttribute('fill', 'none');
+        border.setAttribute('stroke', 'rgba(58,110,220,0.85)');
+        border.setAttribute('stroke-width', '2.5');
+        border.classList.add('tour-dyn');
+        svg.appendChild(border);
+
+        btn.style.transition = 'transform 0.35s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.35s';
+        btn.style.transform  = 'scale(1.04)';
+        btn.style.boxShadow  = '0 0 0 4px rgba(58,110,220,0.18)';
+        _tourTimeout(function() {
+          btn.style.transform = 'scale(1)';
+          btn.style.boxShadow = '';
+        }, 420);
+
+        _posicionarBalao([btn]);
+      }, 200);
+    },
+    onSair: function() {
+      _clearTourTimers();
+      const btn = document.getElementById('btn-exportar-dados');
+      if (btn) { btn.style.transition = ''; btn.style.transform = ''; btn.style.boxShadow = ''; }
+    }
+  },
+
+  // ── 3. IMPORTAR DADOS ──
+  {
+    alvo: 'btn-dados',
+    titulo: 'Importar dados',
+    desc: 'Se você já possui um arquivo de backup salvo anteriormente, use “Importar dados” para recuperar todo o seu histórico. Atenção: os dados atuais serão substituídos pelas informações do arquivo importado.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const svg  = document.getElementById('tour-overlay');
+      const mask = svg.querySelector('#tour-mask');
+      const ns   = 'http://www.w3.org/2000/svg';
+      svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      _esconderBalao();
+
+      _abrirDadosMenuTour();
+
+      _tourTimeout(function() {
+        const btn = document.getElementById('btn-importar-dados');
+        if (!btn) { _mostrarBalao(); return; }
+
+        const z = _getCssZoom();
+        const r = btn.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) { _mostrarBalao(); return; }
+
+        svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+
+        const pad = 6;
+        const x = r.left / z - pad, y = r.top / z - pad;
+        const w = r.width / z + pad * 2, h = r.height / z + pad * 2;
+
+        const hole = document.createElementNS(ns, 'rect');
+        hole.setAttribute('x', x); hole.setAttribute('y', y);
+        hole.setAttribute('width', w); hole.setAttribute('height', h);
+        hole.setAttribute('rx', '9');
+        hole.setAttribute('fill', 'black');
+        hole.classList.add('tour-dyn');
+        mask.appendChild(hole);
+
+        const border = document.createElementNS(ns, 'rect');
+        border.setAttribute('x', x); border.setAttribute('y', y);
+        border.setAttribute('width', w); border.setAttribute('height', h);
+        border.setAttribute('rx', '9');
+        border.setAttribute('fill', 'none');
+        border.setAttribute('stroke', 'rgba(58,110,220,0.85)');
+        border.setAttribute('stroke-width', '2.5');
+        border.classList.add('tour-dyn');
+        svg.appendChild(border);
+
+        btn.style.transition = 'transform 0.35s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.35s';
+        btn.style.transform  = 'scale(1.04)';
+        btn.style.boxShadow  = '0 0 0 4px rgba(58,110,220,0.18)';
+        _tourTimeout(function() {
+          btn.style.transform = 'scale(1)';
+          btn.style.boxShadow = '';
+        }, 420);
+
+        _posicionarBalao([btn]);
+      }, 200);
+    },
+    onSair: function() {
+      _clearTourTimers();
+      fecharDadosMenu();
+      const btn = document.getElementById('btn-importar-dados');
+      if (btn) { btn.style.transition = ''; btn.style.transform = ''; btn.style.boxShadow = ''; }
+    }
+  },
+
+  // ── 4. SALÁRIO 1 ──
   {
     alvo: 'sal1',
     titulo: 'Salário — 1ª parcela',
@@ -5748,6 +6374,29 @@ const _tourPassos = [
 
 const _tourPassosDiario = [
 
+  // ── 0. INTRODUÇÃO DIÁRIO ──
+  {
+    alvo: 'diario-info-card',
+    titulo: 'Página Diário',
+    desc: 'Depois de planejar os gastos fixos na página Mensal, é aqui que entram os imprevistos do dia a dia — uber, lanche, gasolina, aquela compra que não estava nos planos. Separe um valor para esses gastos e o sistema divide pelo número de dias do mês, mostrando quanto você pode usar por dia. O que não usar acumula para o dia seguinte, e assim você acompanha em tempo real se está respeitando o que planejou.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const svg = document.getElementById('tour-overlay');
+      svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      _esconderBalao();
+      _tourTimeout(function() {
+        const balao = document.getElementById('tour-balao');
+        if (balao) {
+          const z = _getCssZoom();
+          balao.style.left = (window.innerWidth / z / 2 - balao.offsetWidth / 2) + 'px';
+          balao.style.top  = (window.innerHeight / z / 2 - balao.offsetHeight / 2) + 'px';
+        }
+        _mostrarBalao();
+      }, 160);
+    },
+    onSair: function() { _clearTourTimers(); }
+  },
+
   // ── 1. LIMITES MENSAL E DIÁRIO ──
   {
     alvo: 'diario-info-card',
@@ -6312,6 +6961,7 @@ function tourPular() {
   _clearTourTimers();
   _tourRemoverSimulacao();
   if (_tourPassos[_tourAtual] && _tourPassos[_tourAtual].onSair) _tourPassos[_tourAtual].onSair();
+  fecharDadosMenu();
   document.querySelectorAll('.select-banco-list.open').forEach(l => l.classList.remove('open'));
   const svg = document.getElementById('tour-overlay');
   svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
@@ -6329,6 +6979,19 @@ function toggleDadosMenu() {
   } else {
     abrirDadosMenu();
   }
+}
+
+function _abrirDadosMenuTour() {
+  const menu = document.getElementById("dados-menu");
+  if (!menu) return;
+  _dadosMenuAberto = true;
+  menu.style.display = "block";
+  requestAnimationFrame(() => {
+    menu.style.opacity = "1";
+    menu.style.transform = "translateX(-50%) translateY(0) scale(1)";
+    menu.style.pointerEvents = "auto";
+  });
+  // Não registra _fecharDadosMenuExterno — o tour controla o fechamento
 }
 
 function abrirDadosMenu() {

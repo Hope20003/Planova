@@ -1,3 +1,67 @@
+/*
+ * ============================================================
+ *  PLANÔVA — style.css
+ *
+ *  ÍNDICE DE SEÇÕES:
+ *  1.  RESET / ZOOM RESPONSIVO
+ *  2.  SPLASH SCREEN — tela inicial animada
+ *  3.  TOPNAV — barra superior (logo, abas, badges)
+ *  4.  NAVEGAÇÃO DE MÊS — botões < > e título
+ *  5.  BANNER MÊS FECHADO — faixa somente leitura
+ *  6.  LAYOUT PRINCIPAL — grid de colunas + painel direito
+ *  7.  BLOCOS — bloco-wrap, gaveta de total
+ *  8.  LINHAS — .linha, inputs, selects, botões inline
+ *  9.  SELECTS CUSTOMIZADOS (bancos) — dropdown colorido
+ *  10. TOOLTIP LIMPAR (×) — centralizado na mensal, direita no diário
+ *  11. SUBCATEGORIA — ícone de tag e tooltip
+ *  12. PAINEL DIREITO — salário, cards de previsão e reserva
+ *  13. CIRCULO SUBTOTAL — barra circular SVG
+ *  14. CARD RESERVA DE EMERGÊNCIA
+ *  15. CARD META — pilha, barra de progresso, navegação
+ *  16. POPUPS — overlays e modais
+ *  17. TOASTS — aviso e fila de notificações
+ *  18. FAB — botões flutuantes inferiores
+ *  19. POPUP CONFIGURAÇÕES
+ *  20. FECHAMENTO CONTÁBIL
+ *  21. PÁGINA DIÁRIO
+ *  22. TOUR GUIADO
+ *  23. SIMULADOR ANUAL
+ *  24. ANO FLASH OVERLAY
+ * ============================================================
+ */
+/*
+ * ============================================================
+ *  PLANÔVA — style.css
+ *
+ *  ÍNDICE DE SEÇÕES:
+ *  1.  RESET e BASE — box-sizing, overflow, zoom responsivo
+ *  2.  SPLASH SCREEN — tela inicial animada
+ *  3.  TOPNAV — barra de navegação superior (logo, abas, badges)
+ *  4.  NAVEGAÇÃO DE MÊS — botões < > e título do mês
+ *  5.  BANNER MÊS FECHADO — faixa "somente leitura"
+ *  6.  LAYOUT PRINCIPAL — grid de 2 colunas + painel direito
+ *  7.  BLOCOS — bloco-wrap, bloco-header-wrap, gaveta de total
+ *  8.  LINHAS — .linha, inputs, selects, botões inline (×, ⟳, tag)
+ *  9.  SELECTS CUSTOMIZADOS (bancos) — dropdown com badge colorido
+ *  10. TOOLTIP LIMPAR — tooltip do botão × nas linhas
+ *  11. SUBCATEGORIA — tooltip e botão de subcategoria
+ *  12. PAINEL DIREITO — salário total, cards de previsão, reserva, metas
+ *  13. CIRCULO SUBTOTAL — barra circular SVG de progresso
+ *  14. CARD RESERVA DE EMERGÊNCIA
+ *  15. CARD META — pilha de cards, barra de progresso, navegação
+ *  16. POPUPS (overlay + modal) — movimento, meta, replicar, conflito etc.
+ *  17. TOASTS — aviso de orçamento e sistema de fila
+ *  18. FAB (botões flutuantes) — engrenagem, dados, tour
+ *  19. POPUP CONFIGURAÇÕES
+ *  20. FECHAMENTO CONTÁBIL — banner, popup fechar/reabrir mês
+ *  21. PÁGINA DIÁRIO — tabela diária, colunas, header
+ *  22. TOUR GUIADO — overlay SVG com máscara e balão
+ *  23. SIMULADOR ANUAL DE RESERVA
+ *  24. ANO FLASH OVERLAY — animação de troca de ano/mês
+ *  25. DROPDOWN ANO / MÊS na topnav
+ * ============================================================
+ */
+
 *
   
    { box-sizing: border-box; }
@@ -7,7 +71,11 @@
     height: 100%;
   }
 
-  /* ── ZOOM RESPONSIVO ──
+  /* ── 1. RESET / ZOOM RESPONSIVO ────────────────────────────────────────
+ *  Ajuste de zoom via CSS custom property --zoom (controlado por JS).
+ *  overflow-x:hidden no html impede scroll lateral indesejado.
+ * ─────────────────────────────────────────────────────────────────────
+/* ── ZOOM RESPONSIVO ──
      O layout foi projetado para ~1440px.
      Em telas menores, reduzimos proporcionalmente para caber sem scroll. */
 
@@ -47,7 +115,11 @@
   /* ── TOP NAV ── */
   @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;600;700&display=swap');
 
-  .topnav {
+  /* ── 3. TOPNAV ──────────────────────────────────────────────────────────
+ *  Barra fixa no topo: logo + nome, abas Mensal/Diário, badge de ano,
+ *  indicador "✓ Salvo".
+ * ────────────────────────────────────────────────────────────────────── */
+.topnav {
     position: sticky;
     top: 0;
     z-index: 100;
@@ -136,7 +208,11 @@
   }
 
   /* ── MES ── */
-  .mes-container {
+  /* ── 4. NAVEGAÇÃO DE MÊS ───────────────────────────────────────────────
+ *  Barra com botões < > para trocar o mês, título clicável (dropdown)
+ *  e botão de replicar mês (⟳) e fechar mês (cadeado).
+ * ────────────────────────────────────────────────────────────────────── */
+.mes-container {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -314,6 +390,11 @@
 
 
   /* ── LAYOUT PRINCIPAL ── */
+/* ── 6. LAYOUT PRINCIPAL ───────────────────────────────────────────────
+ *  Flexbox horizontal: [Coluna 1] [sep] [Coluna 2] [sep] [Painel Direito]
+ *  .separador: linha vertical entre colunas
+ *  .coluna-wrapper: cada coluna de gastos (Pessoa 1 / Pessoa 2)
+ * ────────────────────────────────────────────────────────────────────── */
 .main-layout {
   display: flex;
   justify-content: space-between;
@@ -793,7 +874,14 @@
   #popup-aviso, #popup-aviso-overlay { display: none !important; }
 
   /* ── DROPDOWN CUSTOMIZADO (cartões) ── */
-  .select-banco-wrap {
+  /* ── 9. SELECTS CUSTOMIZADOS (BANCOS) ──────────────────────────────────
+ *  O <select> nativo é ocultado; substituído por .select-banco-wrap.
+ *  .select-banco-display: botão com badge colorido do banco selecionado
+ *  .select-banco-list: dropdown appended ao <body> (escapa overflow:hidden)
+ *  .select-banco-search: campo de busca dentro do dropdown
+ *  .select-banco-clear (×): limpa a seleção
+ * ────────────────────────────────────────────────────────────────────── */
+.select-banco-wrap {
     flex: 2 1 0;
     min-width: 0;
     position: relative;
@@ -947,6 +1035,12 @@
   .select-banco-item.highlighted { background: #dce8fb; color: #1c3f91; font-weight: 600; }
 
   /* ── BLOCO (Residência / Cartões / Outros) ── */
+/* ── 7. BLOCOS ─────────────────────────────────────────────────────────
+ *  Cada coluna tem 3 blocos: Residência, Cartões, Outros.
+ *  .bloco-header-wrap: cabeçalho clicável com gaveta de total
+ *  .bloco-gaveta: valor do total, aparece ao clicar no cabeçalho
+ *  .total-bloco: total somado das linhas do bloco (oculto no DOM, visível só via gaveta)
+ * ────────────────────────────────────────────────────────────────────── */
 .bloco-wrap {
   display: flex;
   flex-direction: column;
@@ -1098,8 +1192,8 @@
     display: block;
     position: absolute;
     bottom: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%);
+    right: 0;          /* alinha pela borda direita do botão, cresce para a esquerda */
+    transform: none;
     background: linear-gradient(135deg, #2c0a0a, #4a1010);
     color: #ff8a80;
     border-radius: 10px;
@@ -1111,7 +1205,7 @@
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.2px;
-    z-index: 500;
+    z-index: 99999;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.12s ease, visibility 0.12s ease;
@@ -1121,8 +1215,8 @@
     content: "";
     position: absolute;
     bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%) rotate(45deg);
+    right: 4px;        /* setinha alinhada à direita, perto do botão */
+    transform: rotate(45deg);
     width: 10px; height: 10px;
     background: #2c0a0a;
     border-right: 1px solid rgba(231,76,60,0.4);
@@ -1131,7 +1225,7 @@
   .btn-limpar-linha:hover .limpar-tooltip {
     opacity: 1;
     visibility: visible;
-    transition-delay: 0.5s; /* delay só na entrada */
+    transition-delay: 0.5s;
   }
 
   .btn-replicar-linha {
@@ -1605,7 +1699,12 @@
     text-align: left;
     display: none;
   }
-  .linha {
+  /* ── 8. LINHAS ─────────────────────────────────────────────────────────
+ *  Cada linha = 1 despesa: [tag] [select] [valor] [checkbox] [⟳] [×]
+ *  .linha.paga: quando checkbox marcado, aplica visual de "pago"
+ *  Botões são injetados via JS (adicionarBotoesLimpar())
+ * ────────────────────────────────────────────────────────────────────── */
+.linha {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1847,7 +1946,16 @@
     z-index: 1;
   }
   /* ── PAINEL DIREITA (Previsão de Saldo, Gastos, Reserva, etc.) ── */
-  .painel-direita {
+  /* ── 12. PAINEL DIREITO ────────────────────────────────────────────────
+ *  Coluna fixa à direita com:
+ *    • Salário total (readonly, soma automática)
+ *    • Ícone de aviso (!) com tooltip "Orçamento estourado"
+ *    • Card "Previsão de Saldo" (verde/vermelho)
+ *    • Card "Previsão de Gastos"
+ *    • Card "Reserva de Emergência"
+ *    • Card(s) Meta em pilha
+ * ────────────────────────────────────────────────────────────────────── */
+.painel-direita {
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -3052,6 +3160,12 @@
 }
 
 /* ══ TELA DIÁRIO ══ */
+/* ── 21. PÁGINA DIÁRIO ─────────────────────────────────────────────────
+ *  Tabela dividida em 2 colunas (quinzenas) mostrando cada dia do mês.
+ *  Colunas: Data | Dia da semana | Disponível (limit diário) | Saída (gasto)
+ *  O limite diário é calculado a partir do limite mensal ÷ dias do mês.
+ *  Campo "Saída" é editável; as outras células são somente leitura.
+ * ────────────────────────────────────────────────────────────────────── */
 .diario-container {
   width: 100%;
   padding: 24px 28px 40px;
@@ -3290,6 +3404,17 @@
   right: 4px;
   top: 50%;
   transform: translateY(-50%);
+}
+/* Tooltip do diário alinhado à direita para não ser cortado */
+.diario-limpar-saida .limpar-tooltip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.diario-limpar-saida .limpar-tooltip::after {
+  left: auto;
+  right: 4px;
+  transform: rotate(45deg);
 }
 .diario-saida-input {
   border: none;
