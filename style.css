@@ -3596,8 +3596,15 @@
 
 /* ══ SIMULADOR — colunas fixas ══ */
 #simulador-table { table-layout: fixed; }
+/* Todas as células do simulador: padding lateral zerado, conteúdo centralizado */
+#simulador-table th,
+#simulador-table td {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  text-align: center !important;
+}
 #simulador-table .sim-input {
-  width: 100%;
+  width: 80%;
   box-sizing: border-box;
   text-align: center;
 }
@@ -3606,23 +3613,26 @@
 #simulador-tbody tr:last-child { border-bottom: none; }
 #simulador-tbody tr:hover { background: #f5f8fd; }
 
-/* ══ SIMULADOR — célula com flex: [input] [⟳] [×] ══ */
+/* ══ SIMULADOR — célula: input centralizado, botões absolutos nos cantos ══ */
 .sim-td-cel {
-  padding: 4px 8px !important;
+  padding: 4px 0 !important;
   overflow: visible;
+  position: relative;
 }
 .sim-td-cel-inner {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
   overflow: visible;
+  width: 100%;
 }
 
-/* ══ SIMULADOR — botões ⟳ e × (inline no flex, sem position absolute) ══ */
+/* ══ SIMULADOR — botões ⟳ e × em position absolute, não afetam centralização ══ */
 .sim-limpar-btn,
 .sim-replicar-btn {
-  position: relative;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: none;
   color: #aab8d8;
@@ -3631,12 +3641,14 @@
   line-height: 1;
   padding: 0 2px;
   margin: 0;
-  flex-shrink: 0;
   overflow: visible;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s, color 0.15s;
 }
+.sim-replicar-btn { left: 2px; }
+.sim-limpar-btn   { right: 2px; }
+/* variantes de entrada ficam nos mesmos cantos */
 .sim-td-cel:hover .sim-limpar-btn,
 .sim-td-cel:hover .sim-replicar-btn {
   opacity: 1;
@@ -3731,7 +3743,7 @@ button:hover .sim-tooltip {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.12s ease, visibility 0.12s ease;
-  transform: translateX(-50%);
+  transform: none; /* posição calculada via JS — não usar translateX */
 }
 #sim-thead-tooltip.show {
   opacity: 1;

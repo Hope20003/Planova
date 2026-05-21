@@ -4834,7 +4834,7 @@ function _renderizarSimulador() {
     const isEntrada = tipo === 'entrada';
     const td = document.createElement('td');
     td.className = 'sim-td-cel';
-    td.style.cssText = 'position:relative;padding:4px 12px;text-align:center;';
+    td.style.cssText = 'position:relative;padding:4px 0;text-align:center;';
 
     const input = document.createElement('input');
     input.type = 'text';
@@ -4903,11 +4903,11 @@ function _renderizarSimulador() {
 
     const tdMes = document.createElement('td');
     tdMes.textContent = mes;
-    tdMes.style.cssText = 'padding:6px 12px;color:#1a2a5e;font-weight:600;font-size:12px;text-align:center;';
+    tdMes.style.cssText = 'padding:6px 0;color:#1a2a5e;font-weight:600;font-size:12px;text-align:center;';
 
     const tdInicial = document.createElement('td');
     tdInicial.className = 'sim-cel-inicial';
-    tdInicial.style.cssText = 'padding:6px 12px;text-align:center;color:#6a7aaa;font-weight:600;font-size:12px;';
+    tdInicial.style.cssText = 'padding:6px 0;text-align:center;color:#6a7aaa;font-weight:600;font-size:12px;';
     tdInicial.textContent = 'R$ 0,00';
 
     const tdEntrada = criarCelula('entrada', i, d.entrada);
@@ -4915,7 +4915,7 @@ function _renderizarSimulador() {
 
     const tdTotal = document.createElement('td');
     tdTotal.className = 'sim-cel-total';
-    tdTotal.style.cssText = 'padding:6px 12px;text-align:center;font-weight:700;font-size:12.5px;color:#1f7a1f;font-family:Outfit,Century Gothic,sans-serif;';
+    tdTotal.style.cssText = 'padding:6px 0;text-align:center;font-weight:700;font-size:12.5px;color:#1f7a1f;font-family:Outfit,Century Gothic,sans-serif;';
     tdTotal.textContent = 'R$ 0,00';
 
     tr.appendChild(tdMes);
@@ -4937,24 +4937,48 @@ function _iniciarTooltipThead() {
     tip.id = 'sim-thead-tooltip';
     document.body.appendChild(tip);
   }
+
+  // Remove listeners antigos substituindo cada botão por uma cópia limpa
+  // (evita acumular múltiplos listeners a cada vez que o simulador abre)
+  document.querySelectorAll('.sim-thead-btn').forEach(btn => {
+    const clone = btn.cloneNode(true);
+    btn.parentNode.replaceChild(clone, btn);
+  });
+
   let _timer = null;
   document.querySelectorAll('.sim-thead-btn').forEach(btn => {
     btn.addEventListener('mouseenter', () => {
       const text = btn.dataset.simTooltip;
       const type = btn.dataset.simTooltipType;
       if (!text) return;
+
+      // zoom CSS no <html> afeta getBoundingClientRect — precisa dividir para position:fixed
+      const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+
+      // Captura posição do botão imediatamente
+      const r = btn.getBoundingClientRect();
+
+      // Aplica conteúdo e cor, mede com dimensões conhecidas do texto
       tip.textContent = text;
-      tip.className = type + ' show';
-      // Não setar show ainda — aguardar delay
-      tip.classList.remove('show');
+      tip.className = type;
+      // Força render fora da tela para medir
+      tip.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;visibility:visible;display:block;';
+      void tip.offsetWidth;
+      const tw = tip.offsetWidth;
+      const th = tip.offsetHeight;
+      // Restaura estilos (transition e demais ficam no CSS)
+      tip.style.cssText = '';
+      tip.className = type;
+
+      // Aplica posição corrigida pelo zoom
+      const btnCenterX = (r.left + r.width / 2) / zoom;
+      const btnTopY    = r.top / zoom;
+      tip.style.left      = (btnCenterX - tw / 2) + 'px';
+      tip.style.top       = (btnTopY - th - 10) + 'px';
+      tip.style.transform = 'none';
+
       clearTimeout(_timer);
-      _timer = setTimeout(() => {
-        const r = btn.getBoundingClientRect();
-        tip.style.left = (r.left + r.width / 2) + 'px';
-        tip.style.top  = (r.top - 10) + 'px';
-        tip.style.transform = 'translateX(-50%) translateY(-100%)';
-        tip.classList.add('show');
-      }, 500);
+      _timer = setTimeout(() => tip.classList.add('show'), 400);
     });
     btn.addEventListener('mouseleave', () => {
       clearTimeout(_timer);
