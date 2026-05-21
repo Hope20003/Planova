@@ -3037,18 +3037,6 @@ function excluirMetaAtiva() {
     });
   }
 
-  // Salva registro de exclusão para exibir a meta como "fantasma" em meses anteriores
-  if (dados) {
-    const _NM = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
-                 "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-    localStorage.setItem("meta_excluida_v2_" + _metaIdx, JSON.stringify({
-      ...dados,
-      excluidoAno: anoAtual,
-      excluidoMes: indice,
-      excluidoLabel: _NM[indice - 1] + "/" + anoAtual
-    }));
-  }
-
   localStorage.removeItem(_metaKey());
 
   const total = _contarMetas();
@@ -3117,21 +3105,7 @@ function _metasPreenchidas() {
   const ativas = _META_KEYS.map((k, i) => ({ idx: i, dados: carregarDadosMeta(i) }))
     .filter(m => m.dados && m.dados.valor && _metaExisteNoMes(m.dados));
 
-  // Metas excluídas: aparecem apenas em meses ANTERIORES ao da exclusão
-  const excluidas = [0, 1, 2].map(i => {
-    const raw = localStorage.getItem("meta_excluida_v2_" + i);
-    if (!raw) return null;
-    const d = JSON.parse(raw);
-    // Só exibe se o mês visualizado é anterior ao mês de exclusão
-    const anteriorAoCorte = anoAtual < d.excluidoAno ||
-      (anoAtual === d.excluidoAno && indice < d.excluidoMes);
-    if (!anteriorAoCorte) return null;
-    // Não duplicar se já existe ativa (não deveria, mas por segurança)
-    if (ativas.some(a => a.idx === i)) return null;
-    return { idx: i, dados: d, excluida: true };
-  }).filter(Boolean);
-
-  return [...ativas, ...excluidas];
+  return ativas;
 }
 
 function _renderizarPilha() {
@@ -3147,7 +3121,7 @@ function _renderizarPilha() {
 
   if (!tem) return;
 
-  // Garante que _metaIdx aponta para um slot com dados (ativo ou excluído visível)
+  // Garante que _metaIdx aponta para um slot com dados
   if (!lista.find(m => m.idx === _metaIdx)) {
     _metaIdx = lista[0].idx;
   }
@@ -3156,34 +3130,6 @@ function _renderizarPilha() {
   const tot = lista.length;
   // posição visual (0-based) dentro da lista preenchida
   const pos = lista.findIndex(m => m.idx === _metaIdx);
-
-  // Badge sutil de "excluída" — aparece apenas quando estamos em mês anterior à exclusão
-  const itemAtivo  = lista.find(m => m.idx === _metaIdx);
-  const foiExcluida = itemAtivo?.excluida === true;
-  let badgeExcluida = document.getElementById("meta-badge-excluida");
-  const cardPrincipal = document.getElementById("meta-card-principal");
-  if (foiExcluida && d?.excluidoLabel) {
-    if (!badgeExcluida) {
-      badgeExcluida = document.createElement("div");
-      badgeExcluida.id = "meta-badge-excluida";
-      badgeExcluida.style.cssText = [
-        "position:absolute", "top:10px", "right:10px",
-        "background:rgba(0,0,0,0.38)", "color:rgba(255,255,255,0.72)",
-        "font-size:9.5px", "font-weight:600", "letter-spacing:0.3px",
-        "padding:3px 7px", "border-radius:20px",
-        "font-family:Outfit,sans-serif", "pointer-events:none",
-        "backdrop-filter:blur(4px)", "z-index:5"
-      ].join(";");
-      if (cardPrincipal) {
-        cardPrincipal.style.position = "relative";
-        cardPrincipal.appendChild(badgeExcluida);
-      }
-    }
-    badgeExcluida.textContent = "Excluída em " + d.excluidoLabel;
-    badgeExcluida.style.display = "block";
-  } else if (badgeExcluida) {
-    badgeExcluida.style.display = "none";
-  }
 
   // Nome
   const nomeEl = document.getElementById("meta-card-nome");
@@ -3709,6 +3655,8 @@ function replicarMesManter()       { _fazerReplicarMes("manter"); }
  *         → iconePrevisao
  * ────────────────────────────────────────────────────────────────────── */
 window.addEventListener("DOMContentLoaded", function() {
+  // Limpa chaves legadas de "meta excluída" que não são mais usadas
+  [0, 1, 2].forEach(i => localStorage.removeItem("meta_excluida_v2_" + i));
   _migrarDatasCriacao();
   adicionarBotoesLimpar();
   inicializarCoresBancos();
@@ -4414,9 +4362,6 @@ function exportarDados() {
     'reserva_meta_v2',
     'reserva_meta_v2_b',
     'reserva_meta_v2_c',
-    'meta_excluida_v2_0',
-    'meta_excluida_v2_1',
-    'meta_excluida_v2_2',
     'cfg_alerta_economia',
     'cfg_alerta_pct',
     'cfg_alerta_cor',
@@ -4501,7 +4446,6 @@ function _confirmarImportacao() {
   ];
   const chavesFixasApp = [
     'reserva_saldo_v1', 'reserva_meta_v2', 'reserva_meta_v2_b', 'reserva_meta_v2_c',
-    'meta_excluida_v2_0', 'meta_excluida_v2_1', 'meta_excluida_v2_2',
     'cfg_alerta_economia', 'cfg_alerta_pct', 'cfg_alerta_cor',
   ];
   const aRemover = [];
