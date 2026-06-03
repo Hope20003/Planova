@@ -71,6 +71,12 @@
     height: 100%;
   }
 
+/* ── SCROLLBAR ESTILIZADO ── */
+body::-webkit-scrollbar              { width: 7px; }
+body::-webkit-scrollbar-track        { background: #e8eef8; border-radius: 6px; }
+body::-webkit-scrollbar-thumb        { background: #a0b4d6; border-radius: 6px; }
+body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
+
   /* ── 1. RESET / ZOOM RESPONSIVO ────────────────────────────────────────
  *  Ajuste de zoom via CSS custom property --zoom (controlado por JS).
  *  overflow-x:hidden no html impede scroll lateral indesejado.
@@ -941,6 +947,11 @@
     overflow-y: auto;
   }
   .select-banco-list.open { display: block; }
+
+  .select-banco-list::-webkit-scrollbar              { width: 5px; }
+  .select-banco-list::-webkit-scrollbar-track        { background: #e8eef8; border-radius: 4px; }
+  .select-banco-list::-webkit-scrollbar-thumb        { background: #4a6fa5; border-radius: 4px; }
+  .select-banco-list::-webkit-scrollbar-thumb:hover  { background: #1c3f91; }
   .select-banco-item {
     padding: 5px 10px;
     font-size: 11px;
@@ -1806,6 +1817,79 @@
   stroke: #E24B4A;
 }
 
+.circulo-diario-hint {
+  display: none;
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid #dce6f8;
+  box-shadow: 0 1px 4px rgba(28,63,145,0.15);
+  color: #1c3f91;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  cursor: default;
+  line-height: 1;
+}
+
+.circulo-diario-hint.visivel {
+  display: flex;
+}
+
+.circulo-diario-hint::after {
+  content: 'Há um período ativo na página Diário vinculado a esses gastos.';
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #0a1a3a, #1a2f6e);
+  color: #a8c4ff;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+  white-space: nowrap;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(58,110,220,0.45);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+  pointer-events: none;
+  z-index: 99999;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease 0.4s, visibility 0.15s ease 0.4s;
+  letter-spacing: 0.2px;
+}
+
+.circulo-diario-hint::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 10px; height: 10px;
+  background: #1a2f6e;
+  border-right: 1px solid rgba(58,110,220,0.45);
+  border-bottom: 1px solid rgba(58,110,220,0.45);
+  pointer-events: none;
+  z-index: 99998;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease 0.4s, visibility 0.15s ease 0.4s;
+}
+
+.circulo-diario-hint:hover::after,
+.circulo-diario-hint:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
 .circulo-subtotal {
   position: absolute;
   top: 8.5px; left: 8.5px;
@@ -1904,6 +1988,28 @@
     gap: 8px;
     margin-left: 50px;
     flex-shrink: 0;
+    width: 140px;
+  }
+
+  .circulo-livre-badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #3a6a3a;
+    background: rgba(46,125,50,0.09);
+    border: 1px solid rgba(46,125,50,0.18);
+    border-radius: 20px;
+    padding: 3px 10px;
+    white-space: nowrap;
+    font-family: 'Outfit', 'Century Gothic', sans-serif;
+    letter-spacing: 0.1px;
+    visibility: visible;
+    min-width: 130px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .circulo-livre-badge.oculto {
+    visibility: hidden;
   }
 
   .btn-subtotal {
@@ -2663,8 +2769,13 @@
     border-radius: 8px;
     box-shadow: 0 6px 20px rgba(28,63,145,0.13), 0 1px 4px rgba(28,63,145,0.08);
     z-index: 10002;
-    overflow: hidden;
+    overflow-y: auto;
+    max-height: 200px;
   }
+  .popup-meta-drop-list::-webkit-scrollbar              { width: 5px; }
+  .popup-meta-drop-list::-webkit-scrollbar-track        { background: #e8eef8; border-radius: 4px; }
+  .popup-meta-drop-list::-webkit-scrollbar-thumb        { background: #4a6fa5; border-radius: 4px; }
+  .popup-meta-drop-list::-webkit-scrollbar-thumb:hover  { background: #1c3f91; }
   .popup-meta-drop-list.open { display: block; }
   .popup-meta-drop-item {
     padding: 6px 10px;
@@ -2678,6 +2789,47 @@
   }
   .popup-meta-drop-item:hover { background: #eef3fd; color: #1c3f91; }
   .popup-meta-drop-item.ativo { background: #e8effe; color: #1c3f91; font-weight: 700; }
+  /* ── Botões de entrada do popup diário ── */
+  .popup-diario-entrada-btn {
+    flex: 1;
+    padding: 6px 0;
+    border-radius: 8px;
+    border: 1.5px solid #dce6f8;
+    background: #fff;
+    color: #5a6a8a;
+    font-size: 11.5px;
+    font-weight: 600;
+    font-family: 'Outfit', 'Century Gothic', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .popup-diario-entrada-btn:hover {
+    border-color: #3a6edc;
+    color: #1c3f91;
+  }
+  .popup-diario-entrada-btn.ativo {
+    background: linear-gradient(135deg, #1c3f91, #3a6edc);
+    border-color: transparent;
+    color: #fff;
+  }
+
+  /* ── Input-dropdown do popup diário ── */
+  .popup-diario-input-drop {
+    width: 100%;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-family: inherit;
+    background-color: #fff;
+    color: #222;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .popup-diario-input-drop::placeholder { color: rgba(0,0,0,0.35); }
+  .popup-diario-input-drop:focus { border-color: #3a6edc; }
 
   /* ── CARDS PREVISÃO DE SALDO e GASTOS ── */
   .previsao-card {
@@ -3160,325 +3312,464 @@
 }
 
 /* ══ TELA DIÁRIO ══ */
-/* ── 21. PÁGINA DIÁRIO ─────────────────────────────────────────────────
- *  Tabela dividida em 2 colunas (quinzenas) mostrando cada dia do mês.
- *  Colunas: Data | Dia da semana | Disponível (limit diário) | Saída (gasto)
- *  O limite diário é calculado a partir do limite mensal ÷ dias do mês.
- *  Campo "Saída" é editável; as outras células são somente leitura.
+/* ── 21. PÁGINA DIÁRIO ──────────────────────────────────────────────────────
+ *  Nova arquitetura: períodos de gasto independentes do mês.
  * ────────────────────────────────────────────────────────────────────── */
+
 .diario-container {
   width: 100%;
-  padding: 24px 28px 40px;
+  padding: 18px 20px 30px;
   box-sizing: border-box;
 }
-.diario-colunas {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-}
+
 .diario-header-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-top: 23px;
   margin-bottom: 20px;
+  gap: 16px;
+  position: relative;
 }
+
+/* Centraliza o nav de mês exatamente como no Mensal */
+.diario-mes-nav-wrapper {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+}
+
 .diario-titulo {
-  font-family: 'Outfit', 'Century Gothic', sans-serif;
-  font-size: 32px;
+  font-size: 22px;
   font-weight: 700;
   color: #0f1f5c;
   margin: 0;
-  letter-spacing: -0.5px;
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.diario-titulo-mes {
-  font-size: 18px;
-  font-weight: 400;
-  color: #5a72a8;
-  letter-spacing: 0;
-}
-.diario-info-card {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  background: #fff;
-  border: 1.5px solid #dce6f8;
-  border-radius: 12px;
-  padding: 10px 20px;
-  height: 56px;
-  box-sizing: border-box;
-  box-shadow: 0 2px 10px rgba(28,63,145,0.08);
-  overflow: visible;
-}
-.diario-info-divider {
-  width: 1px;
-  height: 28px;
-  background: #dce6f8;
-}
-.diario-info-row {
-  display: flex;
-  gap: 40px;
-  justify-content: flex-start;
-  margin-bottom: 20px;
-  padding-left: 4px;
-}
-.diario-info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.diario-info-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: #8a9cc8;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.diario-info-valor {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1f7a1f;
   font-family: 'Outfit', 'Century Gothic', sans-serif;
 }
 
-/* Item do limite mensal — largura fixa: input(88) + gap(6) + botão(22) = 116px */
-.diario-info-item--mensal {
-  width: 116px;
-  flex-shrink: 0;
-}
-
-/* Linha que contém input + botão: dimensões fixas */
-.diario-info-item--mensal > div {
-  height: 22px;
-  width: 116px;
+/* ── Navegação de mês no Diário (igual ao Mensal) ── */
+.diario-mes-nav {
+  display: flex;
   align-items: center;
-  overflow: hidden;
+  gap: 10px;
 }
 
-/* Input inline do limite mensal */
-.diario-limite-input {
-  background: none;
-  border: none;
-  border-bottom: 1.5px solid transparent;
-  outline: none;
-  padding: 0;
-  margin: 0;
-  width: 88px;
-  cursor: default;
-  caret-color: transparent;
-  transition: border-color 0.15s, color 0.15s;
-}
-.diario-limite-input.editando {
-  border-bottom-color: #3a6edc;
-  color: #3a6edc;
-  cursor: text;
-  caret-color: #3a6edc;
+#diario-mes-dropdown-wrap {
+  position: relative;
 }
 
-/* Botão lápis */
-.diario-limite-lapis-btn {
-  background: none;
-  border: none;
+#diario-titulomes {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111;
+  min-width: 140px;
+  text-align: center;
   cursor: pointer;
-  padding: 0;
-  color: #b0bbdb;
+  user-select: none;
   transition: color 0.15s;
-  line-height: 1;
-  width: 16px;
-  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
+  gap: 6px;
+  margin: 0;
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
 }
-.diario-limite-lapis-btn:hover { color: #3a6edc; }
 
-/* Tooltip padrão do sistema */
-.diario-lapis-tooltip {
-  display: block;
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, #0a1a3a, #1a2f6e);
-  border-radius: 10px;
-  padding: 6px 10px;
-  white-space: nowrap;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
-  border: 1px solid rgba(58,110,220,0.45);
-  pointer-events: none;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  z-index: 500;
-  color: #a8c4ff;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.15s, visibility 0.15s;
-  transition-delay: 0s;
-}
-.diario-lapis-tooltip::after {
+#diario-titulomes:hover { color: #1c3f91; }
+
+#diario-titulomes::after {
   content: "";
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%) rotate(45deg);
-  width: 10px; height: 10px;
-  background: #1a2f6e;
-  border-right: 1px solid rgba(58,110,220,0.45);
-  border-bottom: 1px solid rgba(58,110,220,0.45);
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%231c3f91' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
+  transition: transform 0.22s ease, opacity 0.2s;
+  opacity: 0.45;
+  margin-top: 3px;
+  flex-shrink: 0;
 }
-.diario-limite-lapis-btn:hover .diario-lapis-tooltip {
+
+#diario-titulomes:hover::after { opacity: 0.85; }
+
+#diario-mes-dropdown-wrap.aberto #diario-titulomes::after {
+  transform: rotate(180deg);
   opacity: 1;
-  visibility: visible;
-  transition-delay: 0.5s;
 }
 
-.diario-table-wrap {
-  flex: 1;
-  min-width: 0;
-  background: #fff;
-  border-radius: 14px;
-  border: 1.5px solid #dce6f8;
-  box-shadow: 0 2px 16px rgba(28,63,145,0.10);
-  overflow: hidden;
-  align-self: flex-start;
-}
-.diario-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12.5px;
-  table-layout: auto;
-}
-.diario-table th:nth-child(1),
-.diario-table td:nth-child(1) { width: 18%; }
-.diario-table th:nth-child(2),
-.diario-table td:nth-child(2) { width: 28%; }
-.diario-table th:nth-child(3),
-.diario-table td:nth-child(3) { width: 28%; }
-.diario-table th:nth-child(4),
-.diario-table td:nth-child(4) { width: 26%; }
-.diario-table thead tr {
-  background: linear-gradient(to right, #1a2a5e, #2a3f7e);
-}
-.diario-total-row {
-  background: linear-gradient(to right, #1a2a5e, #2a3f7e);
-}
-.diario-table thead th {
-  color: rgba(255,255,255,0.9);
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  padding: 10px 14px;
-  text-align: center;
-}
-.diario-table thead th:first-child { text-align: center; }
-.diario-table tbody tr {
-  border-bottom: 1px solid #eef3fd;
-  transition: background 0.12s;
-}
-.diario-table tbody tr:last-child { border-bottom: none; }
-.diario-table tbody tr:hover { background: #f5f8fd; }
-.diario-table tbody td {
-  padding: 7px 14px;
-  text-align: center;
-  color: #1a2a5e;
-  font-weight: 600;
-}
-.diario-table tbody td:first-child,
-.diario-table tbody td:nth-child(2) {
-  color: #6a7aaa;
-  font-weight: 600;
-  font-size: 12px;
-}
-.diario-td-disponivel { color: #1f7a1f !important; }
-.diario-td-disponivel.negativo { color: rgb(201, 0, 0) !important; }
-.diario-td-saida { color: rgb(201,0,0) !important; }
-
-/* Botão X dentro da célula de saída do diário */
-.diario-limpar-saida {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-/* Tooltip do diário alinhado à direita para não ser cortado */
-.diario-limpar-saida .limpar-tooltip {
-  left: auto;
-  right: 0;
-  transform: none;
-}
-.diario-limpar-saida .limpar-tooltip::after {
-  left: auto;
-  right: 4px;
-  transform: rotate(45deg);
-}
-.diario-saida-input {
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: rgb(201,0,0);
-  text-align: center;
-  width: 100px;
-  font-family: inherit;
-}
-.diario-saida-input::placeholder { color: rgba(201,0,0,0.35); }
-.diario-banco-select {
-  border-color: #3a6edc;
-}
-
-/* Override para select-banco-wrap dentro da tabela diário */
-.diario-table .select-banco-wrap {
-  flex: none;
-  width: 180px;
-  display: block;
-  margin: 0 auto;
-}
-.diario-table .select-banco-display {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  justify-content: center;
-  text-align: center;
-  padding-left: 8px;
-  padding-right: 8px;
-}
-
-.diario-total-row td {
-  color: #fff !important;
-  font-weight: 700 !important;
-  font-size: 12px !important;
-  padding: 9px 14px !important;
-  text-align: center;
-  letter-spacing: 0.2px;
-}
-/* Linha do dia atual no diário */
-.diario-table tbody tr.diario-hoje {
-  background: #eef4ff;
-}
-.diario-table tbody tr.diario-hoje td:first-child {
-  font-weight: 700;
+#diario-mes-dropdown-wrap.aberto #diario-titulomes {
   color: #1c3f91;
 }
-.diario-table tbody tr.diario-hoje::after {
-  content: '';
+
+#diario-mes-dropdown-list {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border: 1px solid rgba(58, 110, 220, 0.35);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(28, 63, 145, 0.13), 0 1px 4px rgba(28,63,145,0.08);
+  z-index: 999;
+  overflow: hidden;
+  min-width: 140px;
 }
-.diario-nav-mes {
+
+#diario-mes-dropdown-list.open { display: block; }
+
+.diario-mes-dropdown-item {
+  padding: 7px 18px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  background: #fff;
+  color: #1a2a5e;
+  text-align: center;
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s;
+}
+
+.diario-mes-dropdown-item:hover {
+  background: #eef3fd;
+  color: #1c3f91;
+}
+
+.diario-mes-dropdown-item.ativo {
+  background: #e8effe;
+  color: #1c3f91;
+  font-weight: 700;
+}
+
+.diario-nav-periodos {
+  display: flex;
+  gap: 6px;
+}
+
+.diario-data-atual {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8a9cc8;
+  background: #f0f4fb;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid #dce6f8;
+}
+
+/* ── Estado vazio ── */
+#diario-vazio-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 280px);
+}
+
+.diario-vazio-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  background: linear-gradient(160deg, rgba(255,255,255,0.92) 0%, rgba(236,243,255,0.75) 100%);
+  border: 1px solid rgba(58,110,220,0.14);
+  border-radius: 22px;
+  padding: 44px 36px 40px;
+  box-shadow: 0 4px 28px rgba(28,63,145,0.09), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+
+.diario-vazio-icone {
+  width: 80px;
+  height: 80px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(28,63,145,0.08), rgba(58,110,220,0.14));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 12px rgba(58,110,220,0.13);
+}
+
+.diario-vazio-titulo {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f1f5c;
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+  letter-spacing: 0.1px;
+}
+
+.diario-vazio-desc {
+  font-size: 12.5px;
+  color: #8a9cc8;
+  line-height: 1.65;
+  max-width: 260px;
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+}
+
+.diario-vazio-btn {
+  margin-top: 4px;
+  padding: 11px 28px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #1c3f91, #3a6edc);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(58,110,220,0.32);
+  transition: opacity 0.15s, transform 0.15s;
+  letter-spacing: 0.2px;
+}
+.diario-vazio-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.diario-vazio-btn:active { transform: translateY(0); }
+
+/* ── Colunas ── */
+.diario-ativo-state {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  width: 100%;
+}
+
+.diario-colunas {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.diario-periodo-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+  transition: opacity 0.3s, filter 0.3s;
+}
+
+.diario-periodo-wrap.unico {
+  flex: 0 0 calc(50% - 12px);
+  max-width: calc(50% - 12px);
+  margin: 0;
+}
+
+/* ── Header do período ── */
+.diario-periodo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+
+.diario-periodo-label {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+  color: #1a2a5e;
+  white-space: nowrap;
+}
+
+.diario-periodo-right-box {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-/* Botões de mês no diário — mesmos do Mensal (aba "planejamento" internamente) */
-.diario-nav-mes .btn-mes {
-  width: 32px;
-  height: 32px;
-  font-size: 14px;
+
+.diario-periodo-valor {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5a6a8a;
+  white-space: nowrap;
 }
+
+.diario-periodo-acoes {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.diario-periodo-btn-edit,
+.diario-periodo-btn-del {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.diario-periodo-btn-edit {
+  color: #c0c8d8 !important;
+}
+.diario-periodo-btn-edit:hover {
+  background: rgba(58,110,220,0.12);
+  color: #3a6edc !important;
+}
+
+.diario-periodo-btn-del {
+  color: #c0c8d8 !important;
+}
+.diario-periodo-btn-del:hover {
+  background: rgba(192,57,43,0.12);
+  color: #c0392b !important;
+}
+
+/* ── Tabela ── */
+.diario-table-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 16px rgba(28,63,145,0.08);
+  border: 1px solid #dce6f8;
+  margin-top: 0;
+}
+
+.diario-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+}
+
+.diario-table thead tr {
+  background: linear-gradient(to right, #0a1540, #1c3f91, #3a6edc);
+}
+
+.diario-table th {
+  background: transparent;
+  color: rgba(255,255,255,0.9);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.diario-table td {
+  padding: 5px 8px;
+  text-align: center;
+  border-bottom: 1px solid #eef2fb;
+  color: #1a2a5e;
+  background: #fff;
+  height: 34px;
+  vertical-align: middle;
+}
+
+.diario-table tbody tr:last-child td { border-bottom: none; }
+.diario-table tbody tr:hover td { background: #f5f8ff; }
+
+/* Destaque do dia atual */
+.diario-table tbody tr.diario-row-hoje td { background: #f5f8ff; }
+.diario-table tbody tr.diario-row-hoje td:first-child { border-left: 3px solid #1c3f91; font-weight: 700; color: #1c3f91; }
+.diario-table tbody tr.diario-row-hoje:hover td { background: #f5f8ff; }
+
+.diario-table th:nth-child(1), .diario-table td:nth-child(1) { width: 26%; }
+.diario-table th:nth-child(2), .diario-table td:nth-child(2) { width: 18%; }
+.diario-table th:nth-child(3), .diario-table td:nth-child(3) { width: 28%; }
+.diario-table th:nth-child(4), .diario-table td:nth-child(4) { width: 28%; }
+
+.diario-table td.diario-td-disponivel { font-weight: 600; color: #7aab7a; }
+.diario-table td.diario-td-disponivel.negativo { color: #c0392b; }
+
+.diario-total-row {
+  background: linear-gradient(to right, #0a1540, #1c3f91, #3a6edc);
+}
+
+.diario-total-row td {
+  background: transparent !important;
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* ── Célula saída: input + botão × lado a lado ── */
+.diario-saida-cel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diario-saida-input {
+  width: 90px;
+  padding: 3px 6px;
+  border: 1.5px solid #dce6f8;
+  border-radius: 7px;
+  font-size: 12px;
+  font-family: inherit;
+  text-align: center;
+  color: #c0392b;
+  font-weight: 600;
+  background: #fff;
+  transition: border-color 0.15s;
+  outline: none;
+}
+.diario-saida-input:focus { border-color: #3a6edc; }
+
+.diario-limpar-saida {
+  position: absolute;
+  right: 4px;
+  background: none;
+  border: none;
+  color: #c0c8e0;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.diario-saida-cel:hover .diario-limpar-saida { opacity: 1; }
+.diario-limpar-saida:hover { color: #c0392b; }
+
+/* ── Período encerrado ── */
+.diario-periodo-encerrado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: #f0f4fb;
+  border-radius: 8px;
+  font-size: 11.5px;
+  color: #8a9cc8;
+  font-weight: 600;
+}
+
+.diario-encerrado-sobrou {
+  color: #1c6e1c;
+  font-weight: 700;
+}
+
+/* ── Botão adicionar segundo período ── */
+.diario-add-segundo {
+  margin-top: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 6px 0;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #8a9cc8;
+  cursor: pointer;
+  transition: color 0.15s;
+  box-sizing: border-box;
+  text-align: center;
+}
+.diario-add-segundo:hover { color: #3a6edc; }
+
 /* ══ BOTÃO SIMULADOR ANUAL ══ */
 .btn-simulador-anual {
   display: flex;
@@ -3854,7 +4145,7 @@ button:hover .sim-tooltip {
 /* ── TOUR: bloqueia interação com tudo abaixo do overlay ── */
 body.tour-ativo input,
 body.tour-ativo textarea,
-body.tour-ativo button:not(#tour-btn-ant):not(#tour-btn-prox):not(#tour-btn-pular),
+body.tour-ativo button:not(#tour-btn-ant):not(#tour-btn-prox):not(#tour-btn-pular):not(#tour-btn-indice):not(.tour-indice-item):not(.tour-indice-fechar),
 body.tour-ativo .select-banco-display,
 body.tour-ativo .select-banco-wrap {
   pointer-events: none !important;
@@ -4083,9 +4374,9 @@ body.tour-ativo .select-banco-list {
 }
 .splash-feat-text span {
   font-family: 'Outfit', 'Century Gothic', sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
-  color: rgba(160,185,230,0.55);
+  color: rgba(160,185,230,0.78);
 }
 
 /* Botão — branco sobre o navy, destaque limpo */
@@ -4174,3 +4465,69 @@ div:hover > .fab-tooltip {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+/* ── Botão devolver sobrado à previsão ── */
+.diario-btn-devolver {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #1c3f91, #3a6edc);
+  border: none;
+  border-radius: 7px;
+  padding: 4px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: inherit;
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.diario-btn-devolver:hover { opacity: 0.85; }
+/* ── Distribuição por bloco no popup movimento ── */
+.popup-dist-bloco {
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+.popup-dist-bloco:hover { opacity: 0.85; }
+.popup-dest-bloco { transition: background 0.15s, color 0.15s, border-color 0.15s; }
+.popup-dest-bloco:hover { opacity: 0.85; }
+/* ── BOTÃO FLUTUANTE TOUR ── */
+@keyframes tourBtnPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(58,110,220,0.7), 0 4px 16px rgba(10,21,64,0.4); }
+  50%  { box-shadow: 0 0 0 8px rgba(58,110,220,0), 0 4px 20px rgba(10,21,64,0.5); }
+  100% { box-shadow: 0 0 0 0 rgba(58,110,220,0.7), 0 4px 16px rgba(10,21,64,0.4); }
+}
+.tour-btn-indice-float {
+  animation: tourBtnPulse 2.4s ease-in-out infinite !important;
+}
+.tour-btn-indice-float:hover {
+  animation: none !important;
+  box-shadow: 0 0 0 4px rgba(58,110,220,0.4), 0 6px 24px rgba(10,21,64,0.5) !important;
+  transform: translateY(-2px);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+/* ── TOUR ÍNDICE PAINEL ── */
+/* Usa top+bottom em vez de height:100vh para funcionar corretamente com zoom CSS */
+#tour-indice-painel {
+  pointer-events: all !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  height: auto !important;
+  overflow: hidden !important;
+}
+#tour-indice-lista {
+  pointer-events: all !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+.tour-indice-item {
+  pointer-events: all !important;
+}
+/* Scrollbar da lista do tour */
+#tour-indice-lista::-webkit-scrollbar { width: 5px; }
+#tour-indice-lista::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 4px; }
+#tour-indice-lista::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 4px; }
+#tour-indice-lista::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.45); }

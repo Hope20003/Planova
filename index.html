@@ -100,7 +100,7 @@
     </div>
     <div id="splash-brand">
       <h1 id="splash-title">Planôva<span id="splash-dot"></span></h1>
-      <p id="splash-tagline">Seu dinheiro tem um futuro. Comece a planejar ele.</p>
+      <p id="splash-tagline">O sistema simples que vale mais do que qualquer planilha.</p>
     </div>
     <div id="splash-divider"></div>
     <div id="splash-features">
@@ -358,7 +358,8 @@
 
         <!-- Subtotal coluna 1 -->
         <div class="subtotal-area">
-          <div class="circulo-subtotal-wrap" id="sub1-wrap"><svg class="circulo-progress-svg" viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg"><circle class="circulo-progress-bg" cx="55" cy="55" r="48"/><circle class="circulo-progress-ring" id="sub1-ring" cx="55" cy="55" r="48" stroke-dasharray="301.59" stroke-dashoffset="301.59" transform="rotate(-90 55 55)"/></svg><div class="circulo-subtotal" id="sub1">R$ 0,00</div></div>
+          <div class="circulo-subtotal-wrap" id="sub1-wrap"><svg class="circulo-progress-svg" viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg"><circle class="circulo-progress-bg" cx="55" cy="55" r="48"/><circle class="circulo-progress-ring" id="sub1-ring" cx="55" cy="55" r="48" stroke-dasharray="301.59" stroke-dashoffset="301.59" transform="rotate(-90 55 55)"/></svg><div class="circulo-subtotal" id="sub1">R$ 0,00</div><div class="circulo-diario-hint" id="sub1-diario-hint">!</div></div>
+          <div class="circulo-livre-badge" id="sub1-livre">Livre: <span id="sub1-livre-val">R$ 0,00</span></div>
         </div>
 
       </div><!-- fim secao-e-subtotal -->
@@ -473,7 +474,8 @@
 
         <!-- Subtotal coluna 2 -->
         <div class="subtotal-area">
-          <div class="circulo-subtotal-wrap" id="sub2-wrap"><svg class="circulo-progress-svg" viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg"><circle class="circulo-progress-bg" cx="55" cy="55" r="48"/><circle class="circulo-progress-ring" id="sub2-ring" cx="55" cy="55" r="48" stroke-dasharray="301.59" stroke-dashoffset="301.59" transform="rotate(-90 55 55)"/></svg><div class="circulo-subtotal" id="sub2">R$ 0,00</div></div>
+          <div class="circulo-subtotal-wrap" id="sub2-wrap"><svg class="circulo-progress-svg" viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg"><circle class="circulo-progress-bg" cx="55" cy="55" r="48"/><circle class="circulo-progress-ring" id="sub2-ring" cx="55" cy="55" r="48" stroke-dasharray="301.59" stroke-dashoffset="301.59" transform="rotate(-90 55 55)"/></svg><div class="circulo-subtotal" id="sub2">R$ 0,00</div><div class="circulo-diario-hint" id="sub2-diario-hint">!</div></div>
+          <div class="circulo-livre-badge" id="sub2-livre">Livre: <span id="sub2-livre-val">R$ 0,00</span></div>
         </div>
 
       </div><!-- fim secao-e-subtotal -->
@@ -658,7 +660,7 @@
   <div id="popup-movimento-sub" style="font-size:11px;color:#8a9cc8;text-align:center;margin-bottom:20px;"></div>
   <div class="popup-meta-group">
     <label class="popup-meta-label">Valor</label>
-    <input class="popup-meta-input" id="popup-movimento-valor" type="text" placeholder="R$ 0,00" oninput="fmtMax(this)" onblur="fmt(this)" autocomplete="off">
+    <input class="popup-meta-input" id="popup-movimento-valor" type="text" placeholder="R$ 0,00" oninput="fmtMax(this);_movimentoAtualizarDistribuicao()" onblur="fmt(this)" autocomplete="off">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:5px;">
       <div id="popup-movimento-max" style="font-size:10px;color:#b0bbdb;display:none;"></div>
       <div style="display:flex;gap:6px;">
@@ -667,7 +669,38 @@
       </div>
     </div>
   </div>
-  <div style="margin-top:22px;">
+
+  <!-- Distribuição entre blocos (depositar: de onde sai / retirar: para onde entra) -->
+  <div id="popup-movimento-blocos" style="display:none;margin-top:12px;">
+    <!-- Depositar: mostra distribuição automática com opção de inverter -->
+    <div id="popup-movimento-dist" style="display:none;">
+      <div id="popup-dist-label" style="font-size:10px;color:#8a9cc8;margin-bottom:5px;text-align:center;letter-spacing:0.2px;text-transform:uppercase;font-weight:600;">Saindo de</div>
+      <div style="display:flex;gap:6px;">
+        <div id="popup-dist-b1" onclick="_movimentoInverterDist()" class="popup-dist-bloco" style="flex:1;border-radius:9px;padding:8px 8px;text-align:center;cursor:pointer;border:1.5px solid rgba(58,110,220,0.25);background:rgba(58,110,220,0.06);transition:all 0.15s;">
+          <div style="font-size:11px;color:#1c3f91;font-weight:700;">Bloco 1</div>
+          <div id="popup-dist-b1-val" style="display:none;">R$ 0,00</div>
+        </div>
+        <div id="popup-dist-b2" onclick="_movimentoInverterDist()" class="popup-dist-bloco" style="flex:1;border-radius:9px;padding:8px 8px;text-align:center;cursor:pointer;border:1.5px solid rgba(58,110,220,0.12);background:rgba(58,110,220,0.02);transition:all 0.15s;">
+          <div style="font-size:11px;color:#1c3f91;font-weight:700;">Bloco 2</div>
+          <div id="popup-dist-b2-val" style="display:none;">R$ 0,00</div>
+        </div>
+      </div>
+    </div>
+    <!-- Retirar: escolhe para qual bloco entra -->
+    <div id="popup-movimento-dest" style="display:none;">
+      <div style="font-size:10px;color:#8a9cc8;margin-bottom:5px;text-align:center;letter-spacing:0.2px;text-transform:uppercase;font-weight:600;">Entrando em</div>
+      <div style="display:flex;gap:6px;">
+        <div id="popup-dest-b1" onclick="_movimentoSelecionarDestino(1)" class="popup-dest-bloco" style="flex:1;border-radius:9px;padding:8px 8px;text-align:center;cursor:pointer;border:1.5px solid rgba(58,110,220,0.25);background:rgba(58,110,220,0.06);transition:all 0.15s;">
+          <div style="font-size:11px;color:#1c3f91;font-weight:700;">Bloco 1</div>
+        </div>
+        <div id="popup-dest-b2" onclick="_movimentoSelecionarDestino(2)" class="popup-dest-bloco" style="flex:1;border-radius:9px;padding:8px 8px;text-align:center;cursor:pointer;border:1.5px solid rgba(58,110,220,0.12);background:rgba(58,110,220,0.02);transition:all 0.15s;">
+          <div style="font-size:11px;color:#1c3f91;font-weight:700;">Bloco 2</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;">
     <button id="popup-movimento-confirmar" onclick="confirmarMovimento()" style="width:100%;border:none;border-radius:10px;padding:9px 0;font-size:12px;font-weight:700;font-family:inherit;color:#fff;cursor:pointer;transition:opacity 0.15s;" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Confirmar</button>
   </div>
 </div>
@@ -941,6 +974,15 @@
     <div id="popup-cobrir-opcoes" style="display:flex;flex-direction:column;gap:6px;"></div>
   </div>
 
+  <!-- Seletor de bloco destino (só aparece com 2 salários) -->
+  <div id="popup-cobrir-dest-wrap" style="display:none;margin-bottom:16px;">
+    <div style="font-size:10px;font-weight:700;color:#b0bbdb;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:7px;">Entrar em</div>
+    <div style="display:flex;gap:6px;">
+      <button id="popup-cobrir-dest-b1" onclick="_cobrirSelecionarBloco(1)" style="flex:1;border-radius:9px;padding:7px 8px;text-align:center;cursor:pointer;border:1.5px solid rgba(58,110,220,0.2);background:none;font-family:inherit;font-size:11px;font-weight:700;color:#8a9cc8;transition:all 0.15s;">Bloco 1</button>
+      <button id="popup-cobrir-dest-b2" onclick="_cobrirSelecionarBloco(2)" style="flex:1;border-radius:9px;padding:7px 8px;text-align:center;cursor:pointer;border:1.5px solid rgba(58,110,220,0.2);background:none;font-family:inherit;font-size:11px;font-weight:700;color:#8a9cc8;transition:all 0.15s;">Bloco 2</button>
+    </div>
+  </div>
+
   <div>
     <button id="popup-cobrir-confirmar" onclick="confirmarCobrir()" style="width:100%;background:linear-gradient(135deg,#1c3f91,#3a6edc);border:none;border-radius:10px;padding:9px 0;font-size:12px;font-weight:700;font-family:inherit;color:#fff;cursor:pointer;box-shadow:0 3px 12px rgba(58,110,220,0.28);transition:opacity 0.15s;" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Confirmar saque</button>
   </div>
@@ -1145,152 +1187,194 @@
 <!-- ══ TELA DIÁRIO ══ -->
 <div id="view-diario" style="display:none;">
   <div class="diario-container">
+
     <div class="diario-header-row">
-      <div style="display:flex;align-items:center;gap:16px;">
-        <h1 class="diario-titulo">Diário <span id="diario-mes-titulo" class="diario-titulo-mes"></span></h1>
-        <div class="diario-nav-mes">
-          <button class="btn-mes" onclick="changeMonth(-1)">&#10094;</button>
-          <button class="btn-mes" onclick="changeMonth(1)">&#10095;</button>
+      <div class="diario-mes-nav-wrapper">
+        <div class="diario-mes-nav">
+          <button class="btn-mes" id="diario-nav-prev" onclick="diarioNavegar(-1)">&#10094;</button>
+          <div id="diario-mes-dropdown-wrap">
+            <h1 id="diario-titulomes" onclick="toggleDiarioMesDropdown()"></h1>
+            <div id="diario-mes-dropdown-list"></div>
+          </div>
+          <button class="btn-mes" id="diario-nav-next" onclick="diarioNavegar(1)">&#10095;</button>
         </div>
       </div>
-      <div class="diario-info-card" id="diario-info-card">
-        <div class="diario-info-item diario-info-item--mensal">
-          <span class="diario-info-label">Limite mensal</span>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <input
-              id="diario-limite-mensal"
-              class="diario-info-valor diario-limite-input"
-              type="text"
-              readonly
-              oninput="fmtMax(this)"
-              onkeydown="if(event.key==='Enter')confirmarEditeLimiteMensal();if(event.key==='Escape')cancelarEditeLimiteMensal();">
-            <button id="diario-limite-confirmar" onclick="confirmarEditeLimiteMensal()"
-              class="btn-confirmar-sal"
-              style="display:none;flex-shrink:0;">↵</button>
-            <button id="diario-limite-lapis" onclick="abrirEditeLimiteMensal()"
-              class="diario-limite-lapis-btn"
-              style="display:none;flex-shrink:0;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              <span class="diario-lapis-tooltip">Editar limite mensal</span>
-            </button>
+      <div class="diario-data-atual" id="diario-data-atual"></div>
+    </div>
+
+    <div id="diario-vazio-state" style="display:none;">
+      <div class="diario-vazio-card">
+        <div class="diario-vazio-icone">
+          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#1c3f91" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2.5"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+            <line x1="8" y1="14" x2="8" y2="14" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="12" y1="14" x2="16" y2="14" stroke-width="1.8"/>
+            <line x1="8" y1="17.5" x2="8" y2="17.5" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="12" y1="17.5" x2="16" y2="17.5" stroke-width="1.8"/>
+          </svg>
+        </div>
+        <div class="diario-vazio-titulo">Nenhum período cadastrado</div>
+        <div class="diario-vazio-desc">Defina um intervalo de datas e valor disponível para acompanhar seus gastos dia a dia.</div>
+        <button class="diario-vazio-btn" onclick="abrirPopupDiarioCadastro(0)">+ Cadastrar período</button>
+      </div>
+    </div>
+
+    <div id="diario-ativo-state" style="display:none;">
+      <div class="diario-colunas" id="diario-colunas">
+
+        <div class="diario-periodo-wrap" id="diario-wrap-0">
+          <div class="diario-periodo-header" id="diario-periodo-header-0">
+            <span class="diario-periodo-label" id="diario-periodo-label-0"></span>
+            <div class="diario-periodo-right-box">
+              <span class="diario-periodo-valor" id="diario-periodo-valor-0"></span>
+              <div class="diario-periodo-acoes">
+                <button class="diario-periodo-btn-edit" onclick="abrirPopupDiarioEditar(0)" title="Editar período"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                <button class="diario-periodo-btn-del" onclick="confirmarExcluirPeriodoDiario(0)" title="Excluir período"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <div class="diario-table-wrap">
+            <table class="diario-table">
+              <thead><tr><th>Data</th><th>Dia</th><th>Disponível</th><th>Saída</th></tr></thead>
+              <tbody id="diario-tbody-0"></tbody>
+              <tfoot><tr class="diario-total-row"><td>Total</td><td></td><td id="diario-total-disp-0"></td><td id="diario-total-saida-0"></td></tr></tfoot>
+            </table>
+          </div>
+          <div class="diario-periodo-encerrado" id="diario-encerrado-0" style="display:none;">
+            <span>Período encerrado</span>
+            <span class="diario-encerrado-sobrou" id="diario-sobrou-0"></span>
+            <button class="diario-btn-devolver" id="diario-devolver-0" style="display:none;" onclick="devolverSobradoDiario(0)">↩ Devolver à previsão de saldo</button>
           </div>
         </div>
-        <div class="diario-info-divider"></div>
-        <div class="diario-info-item">
-          <span class="diario-info-label">Limite diário</span>
-          <span class="diario-info-valor" id="diario-limite-diario">R$ 0,00</span>
+
+        <div class="diario-periodo-wrap" id="diario-wrap-1" style="display:none;">
+          <div class="diario-periodo-header" id="diario-periodo-header-1">
+            <span class="diario-periodo-label" id="diario-periodo-label-1"></span>
+            <div class="diario-periodo-right-box">
+              <span class="diario-periodo-valor" id="diario-periodo-valor-1"></span>
+              <div class="diario-periodo-acoes">
+                <button class="diario-periodo-btn-edit" onclick="abrirPopupDiarioEditar(1)" title="Editar período"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                <button class="diario-periodo-btn-del" onclick="confirmarExcluirPeriodoDiario(1)" title="Excluir período"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <div class="diario-table-wrap">
+            <table class="diario-table">
+              <thead><tr><th>Data</th><th>Dia</th><th>Disponível</th><th>Saída</th></tr></thead>
+              <tbody id="diario-tbody-1"></tbody>
+              <tfoot><tr class="diario-total-row"><td>Total</td><td></td><td id="diario-total-disp-1"></td><td id="diario-total-saida-1"></td></tr></tfoot>
+            </table>
+          </div>
+          <div class="diario-periodo-encerrado" id="diario-encerrado-1" style="display:none;">
+            <span>Período encerrado</span>
+            <span class="diario-encerrado-sobrou" id="diario-sobrou-1"></span>
+            <button class="diario-btn-devolver" id="diario-devolver-1" style="display:none;" onclick="devolverSobradoDiario(1)">↩ Devolver à previsão de saldo</button>
+          </div>
         </div>
+
       </div>
+      <button class="diario-add-segundo" id="diario-add-segundo-btn" style="display:none;">+ Cadastrar segundo período</button>
     </div>
-    <div id="diario-banner-fechado">
-      <div class="mes-fechado-inner">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <span>Somente leitura</span>
-        <button onclick="abrirPopupReabrirMes()" class="banner-fechado-btn">Reabrir</button>
-      </div>
-    </div>
-    <div class="diario-colunas" id="diario-colunas">
-      <!-- Coluna esquerda -->
-      <div class="diario-table-wrap">
-        <table class="diario-table">
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Dia da semana</th>
-              <th>Disponível</th>
-              <th>Saída</th>
-            </tr>
-          </thead>
-          <tbody id="diario-tbody-esq"></tbody>
-        </table>
-      </div>
-      <!-- Coluna direita -->
-      <div class="diario-table-wrap">
-        <table class="diario-table">
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Dia da semana</th>
-              <th>Disponível</th>
-              <th>Saída</th>
-            </tr>
-          </thead>
-          <tbody id="diario-tbody-dir"></tbody>
-          <tfoot>
-            <tr class="diario-total-row">
-              <td>Total</td>
-              <td></td>
-              <td id="diario-total-disponivel-dir"></td>
-              <td id="diario-total-saida-dir"></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>
+
   </div>
 </div>
 
-<!-- ── BOTÕES FLUTUANTES DIÁRIO ── -->
-<div id="fab-diario" style="display:none;position:fixed;bottom:28px;left:28px;z-index:8000;align-items:center;gap:10px;">
-
-  <!-- Botão Config -->
+<!-- ── FAB DIÁRIO ── -->
+<div id="fab-diario" style="position:fixed;bottom:28px;left:28px;z-index:8000;display:none;align-items:center;gap:10px;">
   <div style="position:relative;">
-    <button id="btn-config-diario" onclick="abrirConfigDiario()" style="width:44px;height:44px;border-radius:50%;background:#3a6edc;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(58,110,220,0.38);transition:background 0.18s,transform 0.18s;" onmouseover="this.style.background='#2a5bc8';this.style.transform='rotate(30deg)'" onmouseout="this.style.background='#3a6edc';this.style.transform='rotate(0deg)'">
-      <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </button>
-    <span class="fab-tooltip">Configurações</span>
-  </div>
-
-  <!-- Botão Tour -->
-  <div style="position:relative;">
-    <button onclick="abrirPopupTour()" style="width:44px;height:44px;border-radius:50%;background:#3a6edc;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(58,110,220,0.38);transition:background 0.18s,transform 0.18s;" onmouseover="this.style.background='#2a5bc8';this.style.transform='scale(1.08)'" onmouseout="this.style.background='#3a6edc';this.style.transform='scale(1)'">
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#fff" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+    <button id="btn-tour-diario" onclick="abrirPopupTour()" style="width:44px;height:44px;border-radius:50%;background:#3a6edc;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(58,110,220,0.38);transition:background 0.18s,transform 0.18s;" onmouseover="this.style.background='#2a5bc8';this.style.transform='scale(1.08)'" onmouseout="this.style.background='#3a6edc';this.style.transform='scale(1)'">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#fff" stroke="none">
+        <polygon points="6 3 20 12 6 21 6 3"/>
+      </svg>
     </button>
     <span class="fab-tooltip">Tour guiado</span>
   </div>
-
 </div>
 
-<!-- ── OVERLAY CONFIG DIÁRIO ── -->
-<div id="popup-config-diario-overlay" onclick="fecharConfigDiario()" style="display:none;position:fixed;inset:0;background:rgba(10,21,64,0.32);z-index:9000;backdrop-filter:blur(3px);cursor:pointer;"></div>
-
-<!-- ── POPUP CONFIGURAÇÕES DIÁRIO ── -->
-<div id="popup-config-diario" style="display:none;position:fixed;bottom:92px;left:28px;z-index:9001;background:#fff;border-radius:20px;border:1.5px solid #dce6f8;box-shadow:0 12px 48px rgba(28,63,145,0.18);padding:24px 24px 20px;width:400px;opacity:0;transform:translateY(14px) scale(0.96);transition:opacity 0.22s ease,transform 0.22s cubic-bezier(0.34,1.15,0.64,1);pointer-events:none;">
-  <!-- Header -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <div style="width:32px;height:32px;border-radius:9px;background:rgba(58,110,220,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3a6edc" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      </div>
-      <span style="font-size:15px;font-weight:700;color:#0f1f5c;">Configurações</span>
-    </div>
-    <button onclick="fecharConfigDiario()" style="background:none;border:none;cursor:pointer;color:#b0bbdb;padding:4px;line-height:1;font-size:18px;border-radius:6px;transition:color 0.15s;" onmouseover="this.style.color='#3a6edc'" onmouseout="this.style.color='#b0bbdb'">✕</button>
-  </div>
-  <!-- Card: Limite Mensal -->
-  <div style="background:#f6f8fd;border:1px solid rgba(58,110,220,0.1);border-radius:14px;padding:16px 18px;margin-bottom:10px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;" id="diario-cfg-limite-header">
-      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
-        <div style="width:28px;height:28px;border-radius:8px;background:rgba(58,110,220,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3a6edc" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-        </div>
-        <div>
-          <div style="font-size:13px;font-weight:700;color:#1a2a5e;margin-bottom:2px;">Replicar previsão de saldo em limite mensal</div>
-          <div style="font-size:11px;color:#5a6a8a;line-height:1.5;" id="diario-cfg-limite-sub">Quando desativado, permite editar o limite mensal manualmente.</div>
-        </div>
-      </div>
-      <!-- Toggle -->
-      <div id="diario-cfg-toggle" onclick="toggleLimiteMensalDiario()" style="flex-shrink:0;width:38px;height:22px;border-radius:11px;background:#d0d8ea;cursor:pointer;position:relative;transition:background 0.22s ease;">
-        <div id="diario-cfg-toggle-knob" style="position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.22);transition:left 0.22s ease;"></div>
-      </div>
+<!-- ── POPUP CADASTRAR/EDITAR PERÍODO DIÁRIO ── -->
+<div id="popup-diario-overlay" onclick="fecharPopupDiario()" style="display:none;position:fixed;inset:0;background:rgba(10,21,64,0.38);z-index:10010;backdrop-filter:blur(3px);"></div>
+<div id="popup-diario" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.93);z-index:10011;background:#fff;border-radius:18px;box-shadow:0 12px 48px rgba(28,63,145,0.22),0 2px 8px rgba(0,0,0,0.08);padding:28px 26px 24px;width:320px;max-width:94vw;opacity:0;transition:opacity 0.22s ease,transform 0.22s cubic-bezier(0.34,1.15,0.64,1);pointer-events:none;">
+  <button onclick="fecharPopupDiario()" style="position:absolute;top:16px;right:16px;background:none;border:none;cursor:pointer;color:#b0bbdb;font-size:20px;line-height:1;padding:0;" onmouseover="this.style.color='#3a6edc'" onmouseout="this.style.color='#b0bbdb'">✕</button>
+  <div style="display:flex;justify-content:center;margin-bottom:4px;">
+    <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,rgba(28,63,145,0.1),rgba(58,110,220,0.15));display:flex;align-items:center;justify-content:center;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1c3f91" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     </div>
   </div>
+  <div id="popup-diario-titulo" style="font-family:'Outfit','Century Gothic',sans-serif;font-size:15px;font-weight:700;color:#0f1f5c;text-align:center;margin-bottom:4px;letter-spacing:0.1px;">Cadastrar período</div>
+  <div style="font-size:11px;color:#8a9cc8;text-align:center;margin-bottom:20px;">De quando até quando vai usar esse dinheiro?</div>
 
-  <!-- Rodapé: botão Salvar -->
-  <div style="margin-top:16px;display:flex;justify-content:flex-end;">
-    <button onclick="salvarConfigDiario()" style="background:linear-gradient(135deg,#1c3f91,#3a6edc);border:none;border-radius:10px;padding:9px 24px;font-size:12px;font-weight:700;font-family:inherit;color:#fff;cursor:pointer;box-shadow:0 3px 12px rgba(58,110,220,0.28);transition:opacity 0.15s;" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Salvar</button>
+  <!-- Período: de → até em linha única -->
+  <div class="popup-meta-group">
+    <label class="popup-meta-label">Período</label>
+    <div style="display:flex;align-items:center;gap:6px;">
+
+      <!-- Dia início -->
+      <div class="popup-meta-dropdown" id="popup-diario-dia-ini-wrap" style="flex:0.7;position:relative;">
+        <input class="popup-diario-input-drop" type="text" id="popup-diario-dia-ini-display" placeholder="Dia" maxlength="2" autocomplete="off" style="font-size:12px;">
+        <div class="popup-meta-drop-list" id="popup-diario-dia-ini-list" style="max-height:160px;overflow-y:auto;"></div>
+        <input type="hidden" id="popup-diario-dia-ini" value="">
+      </div>
+      <!-- Mês início -->
+      <div class="popup-meta-dropdown" id="popup-diario-mes-ini-wrap" style="flex:1;position:relative;">
+        <input class="popup-diario-input-drop" type="text" id="popup-diario-mes-ini-display" placeholder="Mês" autocomplete="off" style="font-size:12px;">
+        <div class="popup-meta-drop-list" id="popup-diario-mes-ini-list" style="max-height:160px;overflow-y:auto;"></div>
+        <input type="hidden" id="popup-diario-mes-ini" value="">
+      </div>
+
+      <span style="color:#aab8d8;font-size:13px;font-weight:600;flex-shrink:0;">até</span>
+
+      <!-- Dia fim -->
+      <div class="popup-meta-dropdown" id="popup-diario-dia-fim-wrap" style="flex:0.7;position:relative;">
+        <input class="popup-diario-input-drop" type="text" id="popup-diario-dia-fim-display" placeholder="Dia" maxlength="2" autocomplete="off" style="font-size:12px;">
+        <div class="popup-meta-drop-list" id="popup-diario-dia-fim-list" style="max-height:160px;overflow-y:auto;"></div>
+        <input type="hidden" id="popup-diario-dia-fim" value="">
+      </div>
+      <!-- Mês fim -->
+      <div class="popup-meta-dropdown" id="popup-diario-mes-fim-wrap" style="flex:1;position:relative;">
+        <input class="popup-diario-input-drop" type="text" id="popup-diario-mes-fim-display" placeholder="Mês" autocomplete="off" style="font-size:12px;">
+        <div class="popup-meta-drop-list" id="popup-diario-mes-fim-list" style="max-height:160px;overflow-y:auto;"></div>
+        <input type="hidden" id="popup-diario-mes-fim" value="">
+      </div>
+    </div>
+  </div>
+
+  <!-- Entrada vinculada -->
+  <div class="popup-meta-group" style="margin-top:14px;">
+    <label class="popup-meta-label">Entrada vinculada</label>
+    <div style="display:flex;gap:8px;">
+      <button type="button" class="popup-diario-entrada-btn" id="popup-diario-entrada-1" onclick="_diarioSelecionarEntrada(1)">Entrada 1</button>
+      <button type="button" class="popup-diario-entrada-btn" id="popup-diario-entrada-2" onclick="_diarioSelecionarEntrada(2)">Entrada 2</button>
+    </div>
+    <div id="popup-diario-entrada-info" style="margin-top:6px;font-size:11px;color:#8a9cc8;height:28px;line-height:1.27;overflow:hidden;display:flex;align-items:center;"></div>
+  </div>
+
+  <!-- Valor -->
+  <div class="popup-meta-group" style="margin-top:14px;">
+    <label class="popup-meta-label">Valor utilizado</label>
+    <input class="popup-meta-input" id="popup-diario-valor" type="text" placeholder="R$ 0,00" oninput="fmtDiarioValor(this)" onblur="fmt(this)" autocomplete="off">
+  </div>
+
+  <!-- Erro -->
+  <div id="popup-diario-erro" style="display:none;font-size:11.5px;color:#c0392b;background:#fdf0ee;border-radius:8px;padding:8px 12px;margin-top:12px;line-height:1.5;text-align:center;"></div>
+
+  <div style="margin-top:22px;">
+    <button onclick="salvarPopupDiario()" style="width:100%;background:linear-gradient(135deg,#1c3f91,#3a6edc);border:none;border-radius:10px;padding:9px 0;font-size:12px;font-weight:700;font-family:inherit;color:#fff;cursor:pointer;box-shadow:0 3px 12px rgba(58,110,220,0.28);transition:opacity 0.15s;" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Salvar período</button>
   </div>
 </div>
 
+<!-- ── POPUP CONFIRMAR EXCLUIR PERÍODO DIÁRIO ── -->
+<div id="popup-diario-excluir-overlay" onclick="fecharPopupDiarioExcluir()" style="display:none;position:fixed;inset:0;background:rgba(10,21,64,0.38);z-index:10012;backdrop-filter:blur(2px);"></div>
+<div id="popup-diario-excluir" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.94);z-index:10013;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.18);padding:26px 28px 22px;width:320px;max-width:94vw;text-align:center;opacity:0;transition:opacity 0.2s ease,transform 0.2s ease;pointer-events:none;">
+  <div style="font-size:15px;font-weight:700;color:#0f1f5c;margin-bottom:8px;">Excluir período?</div>
+  <div id="popup-diario-excluir-msg" style="font-size:12px;color:#8a9cc8;margin-bottom:20px;line-height:1.5;"></div>
+  <div style="display:flex;gap:10px;justify-content:center;">
+    <button onclick="fecharPopupDiarioExcluir()" style="padding:9px 18px;border-radius:10px;border:1.5px solid #dce6f8;background:#fff;color:#5a6a8a;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Cancelar</button>
+    <button id="popup-diario-excluir-confirmar" style="padding:9px 20px;border-radius:10px;border:none;background:#c0392b;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Excluir</button>
+  </div>
+</div>
 
 <!-- ══ POPUP CONFIRMAR EXCLUIR META ══ -->
 <div id="popup-excluir-meta-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,21,64,0.38);z-index:10002;backdrop-filter:blur(2px);"></div>
@@ -1303,6 +1387,17 @@
     <button onclick="confirmarExcluirMeta()" style="flex:1;background:linear-gradient(135deg,#c0392b,#e74c3c);border:none;border-radius:10px;padding:9px 0;font-size:12px;font-weight:700;font-family:inherit;color:#fff;cursor:pointer;box-shadow:0 3px 12px rgba(192,57,43,0.28);transition:opacity 0.15s;" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Excluir</button>
   </div>
 </div>
+<script>
+(function() {
+  const _orig = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = function(k, v) {
+    if (k && (k.startsWith('dep_reserva_') || k.startsWith('mov_previsao_blocos_') || (k.startsWith('mov_previsao_') && !k.includes('blocos')))) {
+      console.log('[LS]', k, '=', v, new Error().stack.split('\n').slice(1,4).join(' | '));
+    }
+    return _orig(k, v);
+  };
+})();
+</script>
 <script src="script.js"></script>
 
 <!-- ══ POPUP SIMULADOR ANUAL DE RESERVA ══ -->
@@ -1377,17 +1472,46 @@
      Os passos são definidos em script.js (array _tourPassos).
      ══════════════════════════════════════════ -->
 <!-- ── TOUR GUIADO ── -->
-<svg id="tour-overlay" style="display:none;position:fixed;inset:0;width:100%;height:100%;z-index:50000;pointer-events:all;cursor:default;" xmlns="http://www.w3.org/2000/svg">
+<!-- ── BOTÃO E PAINEL DO ÍNDICE DO TOUR ── -->
+<div id="tour-indice-overlay" onclick="tourFecharIndice()"
+  style="display:none;position:fixed;inset:0;z-index:50008;background:rgba(10,16,45,0.35);backdrop-filter:blur(2px);"></div>
+
+<div id="tour-indice-painel"
+  style="display:none;position:fixed;top:0;left:0;bottom:0;width:248px;
+         z-index:50020;
+         background:linear-gradient(160deg,#0f1f5c 0%,#1c3f91 60%,#2a5298 100%);
+         border-right:none;
+         box-shadow:8px 0 40px rgba(10,16,60,0.45);
+         padding:0;
+         transition:transform 0.28s cubic-bezier(0.34,1.05,0.64,1),opacity 0.22s ease;
+         transform:translateX(-100%);opacity:0;flex-direction:column;overflow:hidden;">
+
+  <!-- Header -->
+  <div style="padding:20px 18px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.1);">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);letter-spacing:1px;text-transform:uppercase;">Guia rápido</span>
+    </div>
+    <button class="tour-indice-fechar" onclick="tourFecharIndice()"
+      style="background:rgba(255,255,255,0.1);border:none;border-radius:6px;cursor:pointer;color:rgba(255,255,255,0.6);width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:14px;transition:background 0.15s;"
+      onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">✕</button>
+  </div>
+
+  <!-- Lista -->
+  <div id="tour-indice-lista" style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:10px 10px 24px;display:flex;flex-direction:column;gap:2px;"></div>
+</div>
+
+<svg id="tour-overlay" style="display:none;position:fixed;inset:0;width:100%;height:100%;z-index:50000;pointer-events:none;cursor:default;" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <mask id="tour-mask">
       <rect width="100%" height="100%" fill="white"/>
       <!-- recortes gerados dinamicamente -->
     </mask>
   </defs>
-  <rect width="100%" height="100%" fill="rgba(10,16,45,0.72)" mask="url(#tour-mask)"/>
+  <rect width="100%" height="100%" fill="rgba(10,16,45,0.72)" mask="url(#tour-mask)" style="pointer-events:none;"/>
   <!-- bordas dos highlights geradas dinamicamente -->
 </svg>
-<div id="tour-balao" style="display:block;position:fixed;z-index:50002;background:#fff;border-radius:16px;border:1.5px solid #dce6f8;box-shadow:0 12px 48px rgba(28,63,145,0.22);padding:22px 24px 18px;width:300px;pointer-events:none;opacity:0;transition:opacity 0.28s ease, transform 0.28s cubic-bezier(0.34,1.15,0.64,1);transform:translateY(8px);">
+<div id="tour-balao" style="display:block;position:fixed;z-index:50050;background:#fff;border-radius:16px;border:1.5px solid #dce6f8;box-shadow:0 12px 48px rgba(28,63,145,0.22);padding:22px 24px 18px;width:300px;pointer-events:none;opacity:0;transition:opacity 0.28s ease, transform 0.28s cubic-bezier(0.34,1.15,0.64,1);transform:translateY(8px);">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px;">
     <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
       <svg style="flex-shrink:0;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3a6edc" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -1404,6 +1528,9 @@
     </div>
   </div>
 </div>
+
+
+<div id="tour-bloqueador" style="display:none;position:fixed;inset:0;z-index:49998;pointer-events:all;"></div>
 
 </body>
 </html>

@@ -1368,6 +1368,16 @@ function abrirPopupCobrir() {
 
   document.getElementById("popup-cobrir-sub").textContent = "";
   document.getElementById("popup-cobrir-deficit").textContent = brl(deficit);
+
+  // Inicializa seletor de bloco destino
+  window._cobrirBlocoDestino = 1;
+  const sal1Cob = num(document.getElementById('sal1').value);
+  const sal2Cob = num(document.getElementById('sal2').value);
+  const destWrap = document.getElementById('popup-cobrir-dest-wrap');
+  if (destWrap) {
+    destWrap.style.display = (sal1Cob > 0 && sal2Cob > 0) ? 'block' : 'none';
+    _cobrirSelecionarBloco(1);
+  }
   _renderOpcoesCobrir(fontes, deficit, modoChk, umaFonte);
   _recalcValorCobrir(deficit, fontes);
 
@@ -1454,6 +1464,20 @@ function fecharPopupCobrir() {
   }, 220);
 }
 
+function _cobrirSelecionarBloco(bloco) {
+  window._cobrirBlocoDestino = bloco;
+  const b1 = document.getElementById('popup-cobrir-dest-b1');
+  const b2 = document.getElementById('popup-cobrir-dest-b2');
+  if (!b1 || !b2) return;
+  if (bloco === 1) {
+    b1.style.background = 'linear-gradient(135deg,#1c3f91,#3a6edc)'; b1.style.color = '#fff'; b1.style.borderColor = 'transparent';
+    b2.style.background = 'none'; b2.style.color = '#8a9cc8'; b2.style.borderColor = 'rgba(58,110,220,0.2)';
+  } else {
+    b2.style.background = 'linear-gradient(135deg,#1c3f91,#3a6edc)'; b2.style.color = '#fff'; b2.style.borderColor = 'transparent';
+    b1.style.background = 'none'; b1.style.color = '#8a9cc8'; b1.style.borderColor = 'rgba(58,110,220,0.2)';
+  }
+}
+
 function confirmarCobrir() {
   const deficit  = _getDeficit();
   const fontes   = _getFontesCobrir();
@@ -1483,6 +1507,10 @@ function confirmarCobrir() {
       dados.movimentos.push({ acao: "retirar", valor: saque, data: new Date().toISOString(), mes: indice, ano: anoAtual, origem: "cobrir-deficit" });
       dados.saldo = calcularSaldoAteMes(dados.movimentos, anoAtual, indice);
       salvarSaldoReserva(dados);
+      // Atualiza dep_reserva_ para que o recalc reflita nos badges
+      const chaveDepResCob = "dep_reserva_" + anoAtual + "_" + indice;
+      const depResAtualCob = parseFloat(localStorage.getItem(chaveDepResCob) || "0");
+      localStorage.setItem(chaveDepResCob, Math.max(0, depResAtualCob - saque).toFixed(2));
       atualizarDisplayReserva();
     } else if (f.id === "meta") {
       // Saca de cada slot de meta proporcionalmente ao seu saldo
@@ -1504,10 +1532,15 @@ function confirmarCobrir() {
     }
   });
 
-  // Rastreia o valor sacado como cobertura (não mexe no mov_previsao — ajuste de previsão de saldo)
+  // Rastreia o valor sacado como cobertura
   const chaveCobertura = "cobrir_valor_" + anoAtual + "_" + indice;
   const cobAcum = parseFloat(localStorage.getItem(chaveCobertura) || "0");
   localStorage.setItem(chaveCobertura, (cobAcum + totalSacado).toFixed(2));
+
+  // Registra em qual bloco o dinheiro da cobertura entra
+  // (para que o badge daquele bloco reflita o alívio)
+  _aplicarRetiradaBloco(window._cobrirBlocoDestino || 1, totalSacado);
+
   recalc();
 
   fecharPopupCobrir();
@@ -1602,6 +1635,7 @@ function _executarAlteracaoSalario() {
 
     localStorage.setItem(chaveAdj, "0");
     localStorage.setItem(chaveCob, "0");
+    localStorage.removeItem('mov_previsao_blocos_' + anoAtual + '_' + indice);
   }
 
   recalc(true, true);
@@ -1696,11 +1730,13 @@ function confirmarAlterarSalario() {
 
   const chaveAdj = "mov_previsao_" + anoAtual + "_" + indice;
 
-  // Reverte depósitos manuais da reserva deste mês
+  // Remove TODOS os movimentos manuais da reserva deste mês (depósitos e retiradas).
+  // Retiradas manuais órfãs (sem depósito correspondente) causariam saldo negativo
+  // e disparariam recalcs incorretos depois.
   {
     const reserva = carregarSaldoReserva();
     const movsFiltrados = (reserva.movimentos || []).filter(m =>
-      !(m.ano === anoAtual && m.mes === indice && m.acao === "depositar" && !m.origem)
+      !(m.ano === anoAtual && m.mes === indice && !m.origem)
     );
     if (movsFiltrados.length !== (reserva.movimentos || []).length) {
       reserva.movimentos = movsFiltrados;
@@ -1711,12 +1747,12 @@ function confirmarAlterarSalario() {
     }
   }
 
-  // Reverte depósitos manuais de cada slot de meta deste mês
+  // Remove TODOS os movimentos manuais de cada slot de meta deste mês (depósitos e retiradas).
   _META_KEYS.forEach((chaveLS, slotIdx) => {
     const metaSlot = carregarDadosMeta(slotIdx);
     if (!metaSlot) return;
     const movsFiltrados = (metaSlot.movimentos || []).filter(m =>
-      !(m.ano === anoAtual && m.mes === indice && m.acao === "depositar" && !m.origem)
+      !(m.ano === anoAtual && m.mes === indice && !m.origem)
     );
     if (movsFiltrados.length !== (metaSlot.movimentos || []).length) {
       metaSlot.movimentos = movsFiltrados;
@@ -1729,6 +1765,28 @@ function confirmarAlterarSalario() {
 
   // Zera o mov_previsao — todos os depósitos foram devolvidos, não resta ajuste pendente
   localStorage.setItem(chaveAdj, "0");
+
+  // Zera cobrir_valor — a retirada que cobriu o déficit foi revertida junto com os depósitos;
+  // manter cobrir_valor causaria _reverterCoberturaParcial() no recalc,
+  // devolvendo dinheiro "fantasma" à reserva (que já foi zerada) e sumindo 500 do badge
+  const _chaveCobConf = "cobrir_valor_" + anoAtual + "_" + indice;
+  const _cobValConf = parseFloat(localStorage.getItem(_chaveCobConf) || "0");
+  if (_cobValConf > 0) {
+    // Remove também os movimentos de retirada de cobertura da reserva deste mês,
+    // pois o saque já foi desfeito pela reversão dos depósitos acima
+    const _reservaConf = carregarSaldoReserva();
+    _reservaConf.movimentos = (_reservaConf.movimentos || []).filter(m =>
+      !(m.ano === anoAtual && m.mes === indice && m.acao === "retirar" && m.origem === "cobrir-deficit")
+    );
+    _reservaConf.saldo = calcularSaldoAteMes(_reservaConf.movimentos, anoAtual, indice);
+    salvarSaldoReserva(_reservaConf);
+    atualizarDisplayReserva();
+    localStorage.setItem(_chaveCobConf, "0");
+  }
+
+  // Zera distribuição por bloco — sem depósitos ativos, retB1/retB2 residuais
+  // causariam desconto negativo nos badges (ex: retB2=200 sem depB2 → badge -200)
+  localStorage.removeItem('mov_previsao_blocos_' + anoAtual + '_' + indice);
 
   _executarAlteracaoSalario();
 }
@@ -2144,6 +2202,9 @@ function changeMonth(d){
   // 6. Anima: a limpeza dos campos acontece DENTRO do callback,
   //    enquanto o overlay está visível — o usuário nunca vê os campos zerados
   document.getElementById("titulomes").innerText = meses[indice];
+  const _diarioMesLabel = document.getElementById('diario-mes-label');
+  if (_diarioMesLabel) _diarioMesLabel.textContent = meses[indice] + ' ' + anoAtual;
+  _atualizarDiarioTituloMes();
   _changeMonthPendente = animarTroca(meses[indice], () => {
     document.querySelectorAll(".val-input").forEach(i => i.value = "");
     document.querySelectorAll(".linha select").forEach(s => s.value = "");
@@ -2198,14 +2259,28 @@ function fmtInput(input){
   try { input.setSelectionRange(pos + diff, pos + diff); } catch(e) {}
 }
 
-let _movimentoMax = Infinity;
+let _movimentoMax    = Infinity;
+let _movimentoMaxOriginal = 0;
+let _movimentoDistInvertida = false; // depositar: true = bloco2 primeiro
+let _movimentoDestino       = 1;     // retirar: 1 ou 2 (bloco destino)
 
 function fmtMax(input) {
   fmtInput(input);
   const v = num(input.value);
   if (_movimentoMax < Infinity && v > _movimentoMax) {
     input.value = brl(_movimentoMax);
+    const len = input.value.length;
+    try { input.setSelectionRange(len, len); } catch(e) {}
   }
+}
+
+// Garante que colagem também respeita o limite máximo
+function _setupFmtMaxPaste(input) {
+  if (input._pasteListenerAttached) return;
+  input._pasteListenerAttached = true;
+  input.addEventListener('paste', function() {
+    setTimeout(function() { fmtMax(input); }, 0);
+  });
 }
 
 function num(str){
@@ -2314,8 +2389,7 @@ function recalc(fromSalary = false, fromUser = false){
 
   const sub1 = r1 + c1 + e1;
   const sub2 = r2 + c2 + e2;
-  document.getElementById("sub1").textContent = brl(sub1);
-  document.getElementById("sub2").textContent = brl(sub2);
+  // textContent atualizado depois, com alocação do diário incluída (ver sub1ComAloc)
 
   const sal1 = num(document.getElementById("sal1").value);
   const sal2 = num(document.getElementById("sal2").value);
@@ -2338,10 +2412,123 @@ function recalc(fromSalary = false, fromUser = false){
       ring.classList.remove("alerta");
     }
   }
-  _atualizarProgressoSubtotal("sub1-ring", sub1, sal1);
-  _atualizarProgressoSubtotal("sub2-ring", sub2, sal2);
+  // Badge "Livre" abaixo de cada círculo — só aparece quando há salário informado
+  function _atualizarBadgeLivre(badgeId, valId, salario, gasto) {
+    const badge = document.getElementById(badgeId);
+    const valEl = document.getElementById(valId);
+    if (!badge || !valEl) return;
+    const livre = salario - gasto;
+    valEl.textContent = brl(livre);
+    badge.classList.remove('oculto');
+    const negativo = livre < 0;
+    valEl.style.color      = negativo ? '#c0392b' : '#2e7d32';
+    badge.style.borderColor = negativo ? 'rgba(192,57,43,0.22)' : 'rgba(46,125,50,0.18)';
+    badge.style.background  = negativo ? 'rgba(192,57,43,0.08)' : 'rgba(46,125,50,0.09)';
+    badge.style.color       = negativo ? '#c0392b' : '#3a6a3a';
+  }
+  // Desconta depósitos em reserva/meta e alocações para o diário do badge livre
+  const _depRes  = parseFloat(localStorage.getItem('dep_reserva_' + anoAtual + '_' + indice) || '0');
+  const _alocRaw = localStorage.getItem(_DIARIO_CHAVE_ALOCACAO);
+  const _alocAll = _alocRaw ? JSON.parse(_alocRaw) : {};
+  const _alocMes = _alocAll[anoAtual + '_' + indice] || {};
+  const _alocE1  = parseFloat(_alocMes['1'] || 0);
+  const _alocE2  = parseFloat(_alocMes['2'] || 0);
+  // Reserva e meta descontam da entrada 1 primeiro; o restante vai para a entrada 2
+  let _depMeta = 0;
+  _META_KEYS.forEach(function(_, si) {
+    _depMeta += parseFloat(localStorage.getItem('dep_meta_' + si + '_' + anoAtual + '_' + indice) || '0');
+  });
+  // Se há registro de blocos, usa o líquido deles (depB1+depB2-retB1-retB2 do mês atual)
+  // para evitar que dep_reserva acumulado de meses anteriores inflacione o desconto.
+  // Caso contrário, usa dep_reserva normalmente.
+  const _blocosRawDesc = localStorage.getItem('mov_previsao_blocos_' + anoAtual + '_' + indice);
+  const _blocosDesc = _blocosRawDesc ? JSON.parse(_blocosRawDesc) : null;
+  const _temBlocosDesc = _blocosDesc && (_blocosDesc.depB1 + _blocosDesc.depB2 + _blocosDesc.retB1 + _blocosDesc.retB2) > 0.004;
+  const _depResFinal = _temBlocosDesc
+    ? Math.max(0, (_blocosDesc.depB1 - _blocosDesc.retB1)) + Math.max(0, (_blocosDesc.depB2 - _blocosDesc.retB2))
+    : _depRes;
+  const _totalDesconto = _depResFinal + _depMeta; // total a descontar nos badges
 
-  const totalGastos    = sub1 + sub2;
+  // Lê distribuição de depósito/retirada por bloco definida pelo usuário
+  const _blocosRaw = localStorage.getItem('mov_previsao_blocos_' + anoAtual + '_' + indice);
+  const _blocos    = _blocosRaw ? JSON.parse(_blocosRaw) : {};
+  // depB1/depB2: quanto do depósito (reserva+meta) saiu de cada bloco → desconta do livre
+  // retB1/retB2: quanto da retirada entrou em cada bloco → soma no livre
+  const _depB1 = parseFloat(_blocos.depB1 || 0);
+  const _depB2 = parseFloat(_blocos.depB2 || 0);
+  const _retB1 = parseFloat(_blocos.retB1 || 0);
+  const _retB2 = parseFloat(_blocos.retB2 || 0);
+  const _temBlocos = (_depB1 + _depB2 + _retB1 + _retB2) > 0.004;
+
+  // Subtotais COM alocação do diário — usados na barra/anel e no valor exibido
+  const sub1ComAloc = sub1 + _alocE1;
+  const sub2ComAloc = sub2 + _alocE2;
+  document.getElementById("sub1").textContent = brl(sub1ComAloc);
+  document.getElementById("sub2").textContent = brl(sub2ComAloc);
+  _atualizarProgressoSubtotal("sub1-ring", sub1ComAloc, sal1);
+  _atualizarProgressoSubtotal("sub2-ring", sub2ComAloc, sal2);
+
+  // Badge "!" — aparece quando há período ativo no Diário vinculado a esta entrada
+  const _hintSub1 = document.getElementById('sub1-diario-hint');
+  const _hintSub2 = document.getElementById('sub2-diario-hint');
+  if (_hintSub1) _hintSub1.classList.toggle('visivel', _alocE1 > 0.004);
+  if (_hintSub2) _hintSub2.classList.toggle('visivel', _alocE2 > 0.004);
+
+  const _livreE1bruto = sal1 - sub1;
+  const _livreE2bruto = sal2 - sub2;
+
+  // Desconto líquido por bloco = depósitos que saíram - retiradas que entraram.
+  // liqBX positivo → desconta do badge (depósito saiu deste bloco)
+  // liqBX negativo → alivia o badge (retirada entrou neste bloco, mesmo sem depósito neste mês)
+  const _liqB1 = _depB1 - _retB1;
+  const _liqB2 = _depB2 - _retB2;
+  const _totalBlocosDef = _liqB1 + _liqB2;
+
+  let _descontoE1, _descontoE2;
+  if (_temBlocos) {
+    if (_liqB1 >= 0 && _liqB2 >= 0) {
+      // Ambos positivos: desconto explícito por bloco + resto automático
+      _descontoE1 = _liqB1;
+      _descontoE2 = _liqB2;
+      const _restoDesconto = Math.max(0, _totalDesconto - _totalBlocosDef);
+      if (_restoDesconto > 0.004) {
+        const _l1rest = Math.max(0, _livreE1bruto - _descontoE1);
+        const _l2rest = Math.max(0, _livreE2bruto - _descontoE2);
+        const _autoE1 = Math.min(_restoDesconto, _l1rest);
+        const _autoE2 = Math.min(_restoDesconto - _autoE1, _l2rest);
+        _descontoE1 += _autoE1;
+        _descontoE2 += _autoE2;
+      }
+    } else {
+      // Há retirada maior que depósito neste mês (ex: mês seguinte ao depósito).
+      // liqBX negativo = o badge deste bloco cresce em |liqBX| (retirada alivia).
+      // Usa liqBX diretamente no gasto: gasto negativo = badge aumenta além do sal-sub.
+      _descontoE1 = _liqB1; // pode ser negativo → subtrai do gasto → aumenta livre
+      _descontoE2 = _liqB2;
+      // Resto do _totalDesconto sem bloco definido: automático bloco1-primeiro
+      const _restoDesconto = Math.max(0, _totalDesconto - Math.max(0, _liqB1) - Math.max(0, _liqB2));
+      if (_restoDesconto > 0.004) {
+        const _l1rest = Math.max(0, _livreE1bruto - Math.max(0, _descontoE1));
+        const _l2rest = Math.max(0, _livreE2bruto - Math.max(0, _descontoE2));
+        const _autoE1 = Math.min(_restoDesconto, _l1rest);
+        const _autoE2 = Math.min(_restoDesconto - _autoE1, _l2rest);
+        _descontoE1 += _autoE1;
+        _descontoE2 += _autoE2;
+      }
+    }
+  } else {
+    // Sem distribuição definida: automático bloco 1 primeiro
+    _descontoE1 = Math.min(_totalDesconto, Math.max(0, _livreE1bruto));
+    _descontoE2 = Math.min(_totalDesconto - _descontoE1, Math.max(0, _livreE2bruto));
+  }
+
+  // gasto inclui desconto (pode ser negativo quando liqBX < 0, aumentando o livre)
+  const _gastoE1 = sub1 + _alocE1 + _descontoE1;
+  const _gastoE2 = sub2 + _alocE2 + _descontoE2;
+  _atualizarBadgeLivre('sub1-livre', 'sub1-livre-val', sal1, _gastoE1);
+  _atualizarBadgeLivre('sub2-livre', 'sub2-livre-val', sal2, _gastoE2);
+
+  const totalGastos    = sub1 + sub2 + _alocE1 + _alocE2; // inclui alocação do diário
   const chaveAdj       = "mov_previsao_"  + anoAtual + "_" + indice;
   const chaveCobertura = "cobrir_valor_"  + anoAtual + "_" + indice;
   const coberturaTotal = parseFloat(localStorage.getItem(chaveCobertura) || "0");
@@ -2383,9 +2570,12 @@ function recalc(fromSalary = false, fromUser = false){
 
 
   // Ícone de aviso se previsão de saldo negativa (inclui depósitos na reserva/meta)
+  const _naDiario = document.getElementById('view-diario') && document.getElementById('view-diario').style.display !== 'none';
   if (totalSal > 0 && previsaoSaldo < -0.005) {
-    if (fromSalary) exibirToastAviso(true);
-    else exibirPopupAviso();
+    if (!_naDiario) {
+      if (fromSalary) exibirToastAviso(true);
+      else exibirPopupAviso();
+    }
     atualizarAvisoIcone(true);
     _atualizarBotaoTooltip();
   } else {
@@ -2678,6 +2868,261 @@ function getPrevisaoDisponivel() {
   return el ? num(el.textContent) : 0;
 }
 
+
+function _movimentoGetLivres() {
+  const sal1 = num(document.getElementById('sal1').value);
+  const sal2 = num(document.getElementById('sal2').value);
+  const alocRaw = localStorage.getItem(_DIARIO_CHAVE_ALOCACAO);
+  const alocAll = alocRaw ? JSON.parse(alocRaw) : {};
+  const alocMes = alocAll[anoAtual + '_' + indice] || {};
+  const alocE1  = parseFloat(alocMes['1'] || 0);
+  const alocE2  = parseFloat(alocMes['2'] || 0);
+  let sub1 = 0, sub2 = 0;
+  document.getElementById('coluna1-wrapper') && document.getElementById('coluna1-wrapper').querySelectorAll('.val-input').forEach(function(i){ sub1 += num(i.value); });
+  document.getElementById('coluna2-wrapper') && document.getElementById('coluna2-wrapper').querySelectorAll('.val-input').forEach(function(i){ sub2 += num(i.value); });
+  // Replica a lógica do recalc para saber quanto de cada bloco já está comprometido.
+  // Isso garante que um segundo depósito vai para o bloco correto sem sobrecarregar o mesmo,
+  // e também funciona quando o salário muda (depB1/depB2 raw podem estar desatualizados).
+  const _depRes2  = parseFloat(localStorage.getItem('dep_reserva_' + anoAtual + '_' + indice) || '0');
+  let _depMetaT2 = 0;
+  _META_KEYS.forEach(function(_, si) {
+    _depMetaT2 += parseFloat(localStorage.getItem('dep_meta_' + si + '_' + anoAtual + '_' + indice) || '0');
+  });
+  const _blocosRaw2 = localStorage.getItem('mov_previsao_blocos_' + anoAtual + '_' + indice);
+  const _blocos2 = _blocosRaw2 ? JSON.parse(_blocosRaw2) : {};
+  const _depB12 = parseFloat(_blocos2.depB1 || 0), _depB22 = parseFloat(_blocos2.depB2 || 0);
+  const _retB12 = parseFloat(_blocos2.retB1 || 0), _retB22 = parseFloat(_blocos2.retB2 || 0);
+  const _liqB12 = _depB12 - _retB12, _liqB22 = _depB22 - _retB22;
+  // Total líquido do mês: depósitos menos saques (não usa dep_reserva que acumula meses anteriores)
+  const _totalDesc2 = Math.max(0, _depB12 - _retB12) + Math.max(0, _depB22 - _retB22) + _depMetaT2;
+  const _temBlocos2 = (_depB12 + _depB22 + _retB12 + _retB22) > 0.004;
+  const _l1b = sal1 - sub1 - alocE1;
+  const _l2b = sal2 - sub2 - alocE2;
+  let _jaE1 = 0, _jaE2 = 0;
+  if (_temBlocos2) {
+    if (_liqB12 >= 0 && _liqB22 >= 0) {
+      _jaE1 = _liqB12; _jaE2 = _liqB22;
+      const _r2 = Math.max(0, _totalDesc2 - _liqB12 - _liqB22);
+      if (_r2 > 0.004) {
+        const _a1 = Math.min(_r2, Math.max(0, _l1b - _jaE1));
+        _jaE1 += _a1;
+        _jaE2 += Math.min(_r2 - _a1, Math.max(0, _l2b - _jaE2));
+      }
+    } else {
+      _jaE1 = Math.max(0, _liqB12); _jaE2 = Math.max(0, _liqB22);
+      const _r2 = Math.max(0, _totalDesc2 - _jaE1 - _jaE2);
+      if (_r2 > 0.004) {
+        const _a1 = Math.min(_r2, Math.max(0, _l1b - _jaE1));
+        _jaE1 += _a1;
+        _jaE2 += Math.min(_r2 - _a1, Math.max(0, _l2b - _jaE2));
+      }
+    }
+  } else {
+    _jaE1 = Math.min(_totalDesc2, Math.max(0, _l1b));
+    _jaE2 = Math.min(_totalDesc2 - _jaE1, Math.max(0, _l2b));
+  }
+  // Crédito cross-month: se liqBX < 0, esse bloco recebeu dinheiro da reserva
+  // e pode devolvê-lo. O livre inclui esse crédito como capacidade de depósito.
+  const _creditoE1 = Math.max(0, -_liqB12);
+  const _creditoE2 = Math.max(0, -_liqB22);
+  const livre1 = Math.max(0, _l1b - _jaE1) + _creditoE1;
+  const livre2 = Math.max(0, _l2b - _jaE2) + _creditoE2;
+  return { livre1, livre2 };
+}
+
+function _movimentoGetEspaco() {
+  const depRes = parseFloat(localStorage.getItem('dep_reserva_' + anoAtual + '_' + indice) || '0');
+  let depMeta = 0;
+  _META_KEYS.forEach(function(_, si) {
+    depMeta += parseFloat(localStorage.getItem('dep_meta_' + si + '_' + anoAtual + '_' + indice) || '0');
+  });
+  const totalDesconto = depRes + depMeta;
+  const sal1 = num(document.getElementById('sal1').value);
+  const sal2 = num(document.getElementById('sal2').value);
+  let sub1 = 0, sub2 = 0;
+  document.getElementById('coluna1-wrapper') && document.getElementById('coluna1-wrapper').querySelectorAll('.val-input').forEach(function(i){ sub1 += num(i.value); });
+  document.getElementById('coluna2-wrapper') && document.getElementById('coluna2-wrapper').querySelectorAll('.val-input').forEach(function(i){ sub2 += num(i.value); });
+  const l1b = sal1 - sub1, l2b = sal2 - sub2;
+  const blocosRaw = localStorage.getItem('mov_previsao_blocos_' + anoAtual + '_' + indice);
+  const blocos = blocosRaw ? JSON.parse(blocosRaw) : {};
+  const retB1 = parseFloat(blocos.retB1 || 0), retB2 = parseFloat(blocos.retB2 || 0);
+
+  const depB1 = parseFloat(blocos.depB1 || 0), depB2 = parseFloat(blocos.depB2 || 0);
+
+  // Total líquido disponível para saque: usa depB1+depB2 (total bruto depositado nos blocos)
+  // descontando apenas os saques já feitos. dep_reserva não é usado aqui pois decremente
+  // no saque causaria dupla subtração com retB1/retB2.
+  const totalDepositadoBlocos = depB1 + depB2 > 0.004 ? depB1 + depB2 : totalDesconto;
+  const totalJaSacado = retB1 + retB2;
+  const liqTotal = Math.max(0, totalDepositadoBlocos - totalJaSacado);
+
+  // Regra de limite por bloco — aplica-se sempre que há registro de depósitos por bloco.
+  // Mesmo sem dep_reserva deste mês (cross-month), os blocos podem ter depB1/depB2
+  // de depósitos anteriores que ainda determinam o limite de saque.
+  const temRegistroBlocos = (depB1 + depB2) > 0.004;
+
+  if (temRegistroBlocos) {
+    // saldoReal = saldo total disponível (inclui meses anteriores + mês atual)
+    const saldoReal = (typeof _movimentoMaxOriginal !== 'undefined' && _movimentoMaxOriginal > 0)
+      ? _movimentoMaxOriginal : liqTotal;
+    // Líquido do mês atual por bloco
+    const liqB1proprio = Math.max(0, depB1 - retB1);
+    const liqB2proprio = Math.max(0, depB2 - retB2);
+    const liqMesAtual = liqB1proprio + liqB2proprio;
+    // Genérico = saldo de meses anteriores (sem restrição de bloco)
+    const saldoGenerico = Math.max(0, saldoReal - liqMesAtual);
+    // B1 pode receber: genérico + próprio do B1 no mês atual
+    // B2 pode receber: tudo (sem restrição)
+    return { espaco1: saldoGenerico + liqB1proprio, espaco2: saldoReal };
+  }
+
+  // Sem registro de blocos: cross-month puro ou primeiro depósito sem distribuição.
+  // Dinheiro livre — pode ir para qualquer bloco.
+  return { espaco1: Infinity, espaco2: Infinity };
+}
+
+function _movimentoAtualizarDistribuicao() {
+  const valor = num(document.getElementById('popup-movimento-valor').value);
+  const blocos = document.getElementById('popup-movimento-blocos');
+  const dist   = document.getElementById('popup-movimento-dist');
+  const dest   = document.getElementById('popup-movimento-dest');
+  if (!blocos || !dist) return;
+
+  if (valor <= 0) {
+    blocos.style.display = 'none';
+    return;
+  }
+
+  blocos.style.display = 'block';
+
+  // Retirada: mostra painel de escolha de bloco destino (dest)
+  // Depósito: mostra painel de distribuição automática (dist)
+  if (_movimentoAcao === 'retirar') {
+    dist.style.display = 'none';
+    if (dest) {
+      dest.style.display = 'block';
+      const b2El = document.getElementById('popup-dest-b2');
+      if (b2El) b2El.style.display = '';
+      // Reaaplica estilo e limite do bloco ativo ao mostrar o painel
+      _movimentoSelecionarDestino(_movimentoDestino || 1);
+    }
+    return;
+  }
+
+  // Depósito: distribuição automática
+  dist.style.display = 'block';
+  if (dest) dest.style.display = 'none';
+
+  const { livre1, livre2 } = _movimentoGetLivres();
+  const cap1 = livre1, cap2 = livre2;
+
+  let d1, d2;
+  if (!_movimentoDistInvertida) {
+    d1 = Math.min(valor, cap1);
+    d2 = Math.min(valor - d1, cap2);
+  } else {
+    d2 = Math.min(valor, cap2);
+    d1 = Math.min(valor - d2, cap1);
+  }
+
+  document.getElementById('popup-dist-b1-val').textContent = brl(d1);
+  document.getElementById('popup-dist-b2-val').textContent = brl(d2);
+
+  const b1El = document.getElementById('popup-dist-b1');
+  const b2El = document.getElementById('popup-dist-b2');
+  const ativo   = 'border:1.5px solid rgba(58,110,220,0.5);background:rgba(58,110,220,0.1);';
+  const inativo = 'border:1.5px solid rgba(58,110,220,0.12);background:rgba(58,110,220,0.02);';
+  b1El.style.border = d1 > 0 ? '1.5px solid rgba(58,110,220,0.5)' : '1.5px solid rgba(58,110,220,0.12)';
+  b1El.style.background = d1 > 0 ? 'rgba(58,110,220,0.1)' : 'rgba(58,110,220,0.02)';
+  b2El.style.border = d2 > 0 ? '1.5px solid rgba(58,110,220,0.5)' : '1.5px solid rgba(58,110,220,0.12)';
+  b2El.style.background = d2 > 0 ? 'rgba(58,110,220,0.1)' : 'rgba(58,110,220,0.02)';
+  b1El.style.cursor = 'pointer';
+  b2El.style.cursor = 'pointer';
+
+  b1El.dataset.valor = d1.toFixed(2);
+  b2El.dataset.valor = d2.toFixed(2);
+}
+
+function _movimentoInverterDist() {
+  _movimentoDistInvertida = !_movimentoDistInvertida;
+  _movimentoAtualizarDistribuicao();
+}
+
+function _movimentoSelecionarDestino(bloco) {
+  const b1 = document.getElementById('popup-dest-b1');
+  const b2 = document.getElementById('popup-dest-b2');
+  if (!b1 || !b2) return;
+
+  // Verifica espaço disponível por bloco
+  const { espaco1, espaco2 } = _movimentoGetEspaco();
+
+  // Se o bloco clicado não tem espaço, ignora o clique
+  if (bloco === 1 && espaco1 <= 0) return;
+  if (bloco === 2 && espaco2 <= 0) return;
+
+  _movimentoDestino = bloco;
+
+  // Desabilita visualmente o bloco sem espaço
+  if (espaco1 <= 0) {
+    b1.style.border = '1.5px solid rgba(180,180,180,0.3)';
+    b1.style.background = 'rgba(180,180,180,0.05)';
+    b1.style.opacity = '0.4';
+    b1.style.cursor = 'not-allowed';
+  } else {
+    b1.style.opacity = '';
+    b1.style.cursor = '';
+  }
+  if (espaco2 <= 0) {
+    b2.style.border = '1.5px solid rgba(180,180,180,0.3)';
+    b2.style.background = 'rgba(180,180,180,0.05)';
+    b2.style.opacity = '0.4';
+    b2.style.cursor = 'not-allowed';
+  } else {
+    b2.style.opacity = '';
+    b2.style.cursor = '';
+  }
+
+  // Estilo ativo/inativo
+  if (bloco === 1) {
+    b1.style.border = '1.5px solid rgba(58,110,220,0.5)';
+    b1.style.background = 'rgba(58,110,220,0.1)';
+    b2.style.border = espaco2 <= 0 ? '1.5px solid rgba(180,180,180,0.3)' : '1.5px solid rgba(58,110,220,0.12)';
+    b2.style.background = espaco2 <= 0 ? 'rgba(180,180,180,0.05)' : 'rgba(58,110,220,0.02)';
+  } else {
+    b2.style.border = '1.5px solid rgba(58,110,220,0.5)';
+    b2.style.background = 'rgba(58,110,220,0.1)';
+    b1.style.border = espaco1 <= 0 ? '1.5px solid rgba(180,180,180,0.3)' : '1.5px solid rgba(58,110,220,0.12)';
+    b1.style.background = espaco1 <= 0 ? 'rgba(180,180,180,0.05)' : 'rgba(58,110,220,0.02)';
+  }
+  // Cursor pointer nos blocos habilitados
+  b1.style.cursor = espaco1 <= 0 ? 'not-allowed' : 'pointer';
+  b2.style.cursor = espaco2 <= 0 ? 'not-allowed' : 'pointer';
+
+  // Atualiza o limite máximo do campo de valor para o bloco selecionado
+  const maxBloco = bloco === 1 ? espaco1 : espaco2;
+  // novoMax = menor entre o saldo total da reserva e o espaço do bloco
+  // Usa _movimentoMaxOriginal para não acumular reduções ao trocar de bloco
+  const _saldoTotal = (typeof _movimentoMaxOriginal !== 'undefined' && _movimentoMaxOriginal > 0)
+    ? _movimentoMaxOriginal : _movimentoMax;
+  const novoMax = isFinite(maxBloco) ? Math.min(_saldoTotal, maxBloco) : _saldoTotal;
+  // Atualiza _movimentoMax para que sacarTudo use o limite correto do bloco
+  _movimentoMax = novoMax;
+  const maxEl = document.getElementById('popup-movimento-max');
+  if (maxEl) {
+    maxEl.textContent = `Valor máximo: ${brl(novoMax)}`;
+    maxEl.style.display = 'block';
+  }
+  // Ajusta o valor digitado se exceder o novo limite
+  const inp = document.getElementById('popup-movimento-valor');
+  if (inp) {
+    const valorAtual = num(inp.value);
+    if (valorAtual > novoMax + 0.004) {
+      inp.value = brl(novoMax);
+      inp.dispatchEvent(new Event('input'));
+    }
+  }
+}
+
 function abrirPopupMovimento(tipo, acao) {
   if (mesFechado(anoAtual, indice)) {
     exibirToastSaldo("Este mês está fechado. Reabra-o para fazer movimentações.");
@@ -2720,7 +3165,20 @@ function abrirPopupMovimento(tipo, acao) {
     }
     if (saldoDisponivel <= 0) {
       const nomeCard = tipo === "reserva" ? "reserva de emergência" : "meta";
-      exibirToastSaldo(`O saldo exibido da ${nomeCard} já foi utilizado em meses seguintes. Não há valor disponível para saque neste mês.`);
+      // Verifica se o saldo é 0 por causa de saques futuros ou simplesmente porque está vazio
+      let saldoAtual = 0;
+      if (tipo === "reserva") {
+        const _dadosRes = carregarSaldoReserva();
+        saldoAtual = calcularSaldoAteMes(_dadosRes.movimentos || [], anoAtual, indice);
+      } else {
+        const _dadosMeta = carregarDadosMeta();
+        if (_dadosMeta) saldoAtual = calcularSaldoAteMes(_dadosMeta.movimentos || [], anoAtual, indice);
+      }
+      if (saldoAtual <= 0) {
+        exibirToastSaldo(`A ${nomeCard} está vazia. Deposite antes de tentar sacar.`);
+      } else {
+        exibirToastSaldo(`O saldo da ${nomeCard} já foi utilizado em meses seguintes. Não há valor disponível para saque neste mês.`);
+      }
       return;
     }
   }
@@ -2736,6 +3194,9 @@ function abrirPopupMovimento(tipo, acao) {
 
   document.getElementById("popup-movimento-icone").innerHTML   = icone;
   document.getElementById("popup-movimento-titulo").textContent  = acao === "depositar" ? "Depositar" : "Retirar";
+  // Atualiza label do painel de distribuição conforme ação
+  const _distLabel = document.getElementById('popup-dist-label');
+  if (_distLabel) _distLabel.textContent = acao === "depositar" ? "Saindo de" : "Entrando em";
   document.getElementById("popup-movimento-sub").textContent     = acao_label + " " + nomeCard;
   document.getElementById("popup-movimento-confirmar").style.background = corBtn;
   document.getElementById("popup-movimento-valor").value = "";
@@ -2760,7 +3221,19 @@ function abrirPopupMovimento(tipo, acao) {
       }
     }
     _movimentoMax = saldoDisponivel;
-    if (maxEl) { maxEl.textContent = `Valor máximo: ${brl(saldoDisponivel)}`; maxEl.style.display = "block"; }
+    _movimentoMaxOriginal = saldoDisponivel;
+    // Calcula o espaço por bloco e seleciona o maior
+    const { espaco1: _esp1, espaco2: _esp2 } = _movimentoGetEspaco();
+    const _blocoInicial = (_esp1 >= _esp2) ? 1 : 2;
+    // Calcula novoMax diretamente aqui para o display (sem depender de _movimentoSelecionarDestino)
+    const _maxBlocoInicial = _blocoInicial === 1 ? _esp1 : _esp2;
+    const _novoMaxInicial = isFinite(_maxBlocoInicial)
+      ? Math.min(saldoDisponivel, _maxBlocoInicial)
+      : saldoDisponivel;
+    _movimentoMax = _novoMaxInicial;
+    _movimentoDestino = _blocoInicial; // garante que input/sacarTudo usem o bloco correto
+    _movimentoSelecionarDestino(_blocoInicial);
+    if (maxEl) { maxEl.textContent = `Valor máximo: ${brl(_novoMaxInicial)}`; maxEl.style.display = 'block'; }
   }
 
   // Mostra botão "Sacar tudo" apenas ao retirar
@@ -2768,6 +3241,30 @@ function abrirPopupMovimento(tipo, acao) {
   const btnDepositarTudo = document.getElementById("popup-movimento-depositar-tudo");
   if (btnSacarTudo)     btnSacarTudo.style.display     = (acao === "retirar")  ? "inline-block" : "none";
   if (btnDepositarTudo) btnDepositarTudo.style.display  = (acao === "depositar") ? "inline-block" : "none";
+
+  // Inicializa painel de blocos — limpa estado anterior
+  _movimentoDistInvertida = false;
+  // _movimentoDestino já foi definido pelo _blocoInicial acima — não resetar aqui
+  const blocos = document.getElementById('popup-movimento-blocos');
+  const dist   = document.getElementById('popup-movimento-dist');
+  const dest   = document.getElementById('popup-movimento-dest');
+  if (blocos) blocos.style.display = 'none';
+  if (dist)   dist.style.display   = 'none';
+  if (dest)   dest.style.display   = 'none';
+  // Limpa dataset.valor dos cards de distribuição para evitar lixo entre operações
+  const _b1El = document.getElementById('popup-dist-b1');
+  const _b2El = document.getElementById('popup-dist-b2');
+  if (_b1El) { _b1El.dataset.valor = '0'; document.getElementById('popup-dist-b1-val').textContent = brl(0); }
+  if (_b2El) { _b2El.dataset.valor = '0'; document.getElementById('popup-dist-b2-val').textContent = brl(0); }
+
+  if (acao === 'retirar' && blocos) {
+    // Para retirada com 2 salários: usa painel de distribuição (igual ao depósito)
+    // O oninput do campo de valor já chama _movimentoAtualizarDistribuicao
+    // Não precisamos mostrar nada agora — aparece ao digitar o valor
+  }
+  if (acao === 'depositar' && blocos) {
+    // Para depósito: painel aparece ao digitar também
+  }
 
   const overlay = document.getElementById("popup-movimento-overlay");
   const popup   = document.getElementById("popup-movimento");
@@ -2777,18 +3274,30 @@ function abrirPopupMovimento(tipo, acao) {
     popup.style.opacity       = "1";
     popup.style.transform     = "translate(-50%,-50%) scale(1)";
     popup.style.pointerEvents = "auto";
-    setTimeout(() => document.getElementById("popup-movimento-valor").focus(), 150);
+    const _mvInp = document.getElementById("popup-movimento-valor"); _setupFmtMaxPaste(_mvInp); setTimeout(() => _mvInp.focus(), 150);
   });
 }
 
 function sacarTudo() {
-  if (_movimentoMax <= 0) return;
   const inp = document.getElementById("popup-movimento-valor");
   if (!inp) return;
-  inp.value = brl(_movimentoMax);
+  // Recalcula o limite do bloco selecionado para garantir restrição correta
+  // mesmo se o popup foi aberto sem digitar nada ainda
+  if (_movimentoAcao === 'retirar') {
+    const { espaco1, espaco2 } = _movimentoGetEspaco();
+    const maxBloco = (_movimentoDestino === 2) ? espaco2 : espaco1;
+    const limiteReal = isFinite(maxBloco)
+      ? Math.min(_movimentoMaxOriginal || _movimentoMax, maxBloco)
+      : (_movimentoMaxOriginal || _movimentoMax);
+    if (limiteReal <= 0) return;
+    // Atualiza _movimentoMax com o limite correto antes de preencher
+    _movimentoMax = limiteReal;
+    inp.value = brl(limiteReal);
+  } else {
+    if (_movimentoMax <= 0) return;
+    inp.value = brl(_movimentoMax);
+  }
   inp.dispatchEvent(new Event("input"));
-  inp.style.borderColor = "#e74c3c";
-  setTimeout(() => inp.style.borderColor = "", 800);
 }
 
 function depositarTudo() {
@@ -2808,6 +3317,7 @@ function fecharPopupMovimento() {
   const overlay = document.getElementById("popup-movimento-overlay");
   const popup   = document.getElementById("popup-movimento");
   _movimentoMax = Infinity;
+  _movimentoMaxOriginal = 0;
   popup.style.opacity       = "0";
   popup.style.transform     = "translate(-50%,-50%) scale(0.93)";
   popup.style.pointerEvents = "none";
@@ -2879,6 +3389,8 @@ function confirmarMovimento() {
     const depResAtual = parseFloat(localStorage.getItem(chaveDepRes) || "0");
     const deltaRes = _movimentoAcao === "depositar" ? valor : -valor;
     localStorage.setItem(chaveDepRes, Math.max(0, depResAtual + deltaRes).toFixed(2));
+    // Guarda quanto do saque veio de depósitos DESTE mês (antes do clamp)
+    window._depResMesAntes = depResAtual; // usado logo abaixo no cálculo cross-month
     salvarSaldoReserva(dados);
     atualizarDisplayReserva();
 
@@ -2894,16 +3406,97 @@ function confirmarMovimento() {
       const depAtual = parseFloat(localStorage.getItem(chaveSlot) || "0");
       const deltaMeta = _movimentoAcao === "depositar" ? valor : -valor;
       localStorage.setItem(chaveSlot, Math.max(0, depAtual + deltaMeta).toFixed(2));
+      window._depMetaMesAntes = depAtual; // usado logo abaixo no cálculo cross-month
       salvarDadosMeta(dados.valor, dados.mes, dados.ano, dados.categoria, dados.saldoAcumulado, dados.movimentos);
     }
     atualizarBarraReserva();
   }
 
+  // Depósito: lê distribuição do painel dist (dataset.valor)
+  // Retirada: usa _movimentoDestino (bloco escolhido no painel dest)
+  let _d1Final = 0, _d2Final = 0;
+  if (_movimentoAcao === 'depositar') {
+    _d1Final = parseFloat((document.getElementById('popup-dist-b1') || {}).dataset.valor || '0');
+    _d2Final = parseFloat((document.getElementById('popup-dist-b2') || {}).dataset.valor || '0');
+  } else {
+    // Enforça o limite por bloco ANTES de modificar dep_reserva
+    // (o espaco já foi calculado quando _movimentoSelecionarDestino foi chamado — usa _movimentoMax)
+    const valorLimitado = Math.min(valor, _movimentoMax);
+    if (_movimentoDestino === 2) { _d2Final = valorLimitado; } else { _d1Final = valorLimitado; }
+    valor = valorLimitado;
+  }
+
+  window._depResMesAntes  = 0;
+  window._depMetaMesAntes = 0;
+
   fecharPopupMovimento();
-  const sinal = (_movimentoAcao === "depositar") ? valor : -valor;
-  aplicarMovimentoPrevisao(sinal);
+
+  // Aplica distribuição por bloco
+  if (_movimentoAcao === 'depositar') {
+    _aplicarDepositoBlocos(_d1Final, _d2Final);
+  } else {
+    _aplicarRetiradaBlocos(_d1Final, _d2Final, valor);
+  }
+
   salvarMes();
   recalc();
+}
+
+// Registra a fração do depósito que veio de cada bloco.
+// dep_reserva/dep_meta já guardam o total — aqui só guardamos a repartição por bloco.
+function _aplicarDepositoBlocos(d1, d2) {
+  const chave = 'mov_previsao_blocos_' + anoAtual + '_' + indice;
+  const raw = localStorage.getItem(chave);
+  const atual = raw ? JSON.parse(raw) : { depB1: 0, depB2: 0, retB1: 0, retB2: 0 };
+
+  // Re-depósito cancela retiradas anteriores do mesmo bloco:
+  // se retB1>0 e depositando no B1, reduz retB1 primeiro antes de aumentar depB1.
+  // Isso garante que liqTotal = totalDesconto - retB1 - retB2 seja consistente.
+  if (d1 > 0) {
+    const cancelaRet1 = Math.min(d1, atual.retB1 || 0);
+    atual.retB1 = (atual.retB1 || 0) - cancelaRet1;
+    atual.depB1 = (atual.depB1 || 0) + (d1 - cancelaRet1);
+  }
+  if (d2 > 0) {
+    const cancelaRet2 = Math.min(d2, atual.retB2 || 0);
+    atual.retB2 = (atual.retB2 || 0) - cancelaRet2;
+    atual.depB2 = (atual.depB2 || 0) + (d2 - cancelaRet2);
+  }
+
+  localStorage.setItem(chave, JSON.stringify(atual));
+  aplicarMovimentoPrevisao(d1 + d2);
+}
+
+// Retirada: registra em qual bloco entrou e aplica à previsão.
+// retB1/retB2 são usados no recalc para forçar que o alívio do desconto
+// caia no bloco correto (não se distribuir automaticamente 50/50).
+function _aplicarRetiradaBloco(bloco, valor) {
+  const chave = 'mov_previsao_blocos_' + anoAtual + '_' + indice;
+  const raw = localStorage.getItem(chave);
+  const atual = raw ? JSON.parse(raw) : { depB1: 0, depB2: 0, retB1: 0, retB2: 0 };
+  if (bloco === 1) atual.retB1 = (atual.retB1 || 0) + valor;
+  else             atual.retB2 = (atual.retB2 || 0) + valor;
+  localStorage.setItem(chave, JSON.stringify(atual));
+  aplicarMovimentoPrevisao(-valor);
+}
+
+// Versão distribuída: registra r1 no bloco 1 e r2 no bloco 2.
+// total = porção que veio de depósitos DESTE mês (pode ser 0 para retiradas cross-month).
+// r1/r2 são sempre registrados nos blocos para atualizar os badges.
+// Mas aplicarMovimentoPrevisao só é chamado para a porção deste mês (total).
+// Para saque cross-month (total=0): badge atualiza via retB1/retB2, previsão não muda.
+function _aplicarRetiradaBlocos(r1, r2, total) {
+  // Registra nos blocos para atualizar badges
+  if (r1 > 0.004 || r2 > 0.004) {
+    const chave = 'mov_previsao_blocos_' + anoAtual + '_' + indice;
+    const raw = localStorage.getItem(chave);
+    const atual = raw ? JSON.parse(raw) : { depB1: 0, depB2: 0, retB1: 0, retB2: 0 };
+    atual.retB1 = (atual.retB1 || 0) + r1;
+    atual.retB2 = (atual.retB2 || 0) + r2;
+    localStorage.setItem(chave, JSON.stringify(atual));
+  }
+  // Sempre atualiza previsão — saque sempre libera dinheiro no mês atual
+  aplicarMovimentoPrevisao(-total);
 }
 
 // Armazena o ajuste do mês atual para o cálculo da previsão de saldo.
@@ -3753,156 +4346,1003 @@ function abrirConfig() {
   }));
 }
 
-let _configDiarioAberto  = false;
-let _configDiarioPending = null; // estado temporário enquanto o popup está aberto
-let _previsaoSaldoCache  = 0;    // cache do último valor calculado por recalc()
+/* ══════════════════════════════════════════════
+   DIÁRIO — NOVA ARQUITETURA v3
+   Períodos de gasto independentes do mês.
+   ══════════════════════════════════════════════ */
 
-function abrirConfigDiario() {
-  if (_configDiarioAberto) { fecharConfigDiario(); return; }
-  _configDiarioAberto = true;
+const _DIARIO_CHAVE_PERIODOS  = 'diario_periodos_v3';
+const _DIARIO_CHAVE_SAIDAS    = 'diario_saidas_v3';
+const _DIARIO_CHAVE_ALOCACAO  = 'diario_alocacao_v1'; // { mesAno: { '1': valor, '2': valor } }
+const _DIARIO_MAX_HISTORICO  = 6;
+let   _diarioPeriodoAtual    = 0;
+let   _diarioSlotEditando    = null;
 
-  // Captura o estado salvo como ponto de partida do estado pendente
-  const { ativo } = getLimiteMensalDiario();
-  _configDiarioPending = { ativo };
+function _diarioCarregarPeriodos() {
+  const raw = localStorage.getItem(_DIARIO_CHAVE_PERIODOS);
+  return raw ? JSON.parse(raw) : [];
+}
 
-  const overlay = document.getElementById('popup-config-diario-overlay');
-  const popup   = document.getElementById('popup-config-diario');
-  if (overlay) { overlay.style.display = 'block'; }
-  if (popup)   {
-    popup.style.display = 'block';
-    _sincronizarToggleLimiteDiario();
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      popup.style.opacity   = '1';
-      popup.style.transform = 'translateY(0) scale(1)';
-      popup.style.pointerEvents = 'auto';
-    }));
+function _diarioSalvarPeriodos(arr) {
+  localStorage.setItem(_DIARIO_CHAVE_PERIODOS, JSON.stringify(arr));
+  // Recalcula alocações agrupadas por (ano, mes, entrada) para o recalc/badge
+  _diarioRecalcularAlocacoes(arr);
+}
+
+function _diarioRecalcularAlocacoes(arr) {
+  // Reconstrói o mapa de alocações do zero a partir dos períodos salvos
+  const raw = localStorage.getItem(_DIARIO_CHAVE_ALOCACAO);
+  const all = raw ? JSON.parse(raw) : {};
+  // Limpa apenas as chaves que existiam (não apaga dados de outros meses não afetados)
+  // Reconstrói completo para garantir consistência
+  const novoAll = {};
+  (arr || []).forEach(function(p) {
+    const key = p.anoRef + '_' + p.mesRef;
+    if (!novoAll[key]) novoAll[key] = { '1': 0, '2': 0 };
+    const entKey = String(p.entrada);
+    if (entKey === '1' || entKey === '2') {
+      novoAll[key][entKey] = (novoAll[key][entKey] || 0) + (p.valor || 0);
+    }
+  });
+  localStorage.setItem(_DIARIO_CHAVE_ALOCACAO, JSON.stringify(novoAll));
+}
+
+function _diarioChaveSaida(periodoId, ano, mes, dia) {
+  const mm = String(mes + 1).padStart(2, '0');
+  const dd = String(dia).padStart(2, '0');
+  return _DIARIO_CHAVE_SAIDAS + '_' + periodoId + '_' + ano + '-' + mm + '-' + dd;
+}
+
+function _diarioSalvarSaida(periodoId, ano, mes, dia, valor) {
+  localStorage.setItem(_diarioChaveSaida(periodoId, ano, mes, dia), valor || '');
+}
+
+function _diarioCarregarSaida(periodoId, ano, mes, dia) {
+  return localStorage.getItem(_diarioChaveSaida(periodoId, ano, mes, dia)) || '';
+}
+
+function _diarioParseData(ano, mes, dia) {
+  return new Date(ano, mes, dia);
+}
+
+function _diarioDiffDias(d1, d2) {
+  return Math.round((d2 - d1) / 86400000);
+}
+
+function _diarioPeriodoEncerrado(p) {
+  const hoje = new Date();
+  const fim  = _diarioParseData(p.anoFim, p.mesFim, p.diaFim);
+  return hoje > new Date(fim.getFullYear(), fim.getMonth(), fim.getDate() + 1) - 1;
+}
+
+function _diarioPeriodoTemSaidas(p) {
+  const ini = _diarioParseData(p.anoIni, p.mesIni, p.diaIni);
+  const fim = _diarioParseData(p.anoFim, p.mesFim, p.diaFim);
+  const cur = new Date(ini);
+  while (cur <= fim) {
+    const v = _diarioCarregarSaida(p.id, cur.getFullYear(), cur.getMonth(), cur.getDate());
+    if (v && num(v) > 0) return true;
+    cur.setDate(cur.getDate() + 1);
   }
+  return false;
 }
 
-function fecharConfigDiario() {
-  // Descarta alterações pendentes — reverte para o estado salvo
-  _configDiarioPending = null;
-  _configDiarioAberto  = false;
-  _sincronizarToggleLimiteDiario(); // restaura visual do toggle
+function _diarioPeriodasSeSobrepoe(p1, p2) {
+  const ini1 = _diarioParseData(p1.anoIni, p1.mesIni, p1.diaIni);
+  const fim1 = _diarioParseData(p1.anoFim, p1.mesFim, p1.diaFim);
+  const ini2 = _diarioParseData(p2.anoIni, p2.mesIni, p2.diaIni);
+  const fim2 = _diarioParseData(p2.anoFim, p2.mesFim, p2.diaFim);
+  return ini1 <= fim2 && ini2 <= fim1;
+}
 
-  const overlay = document.getElementById('popup-config-diario-overlay');
-  const popup   = document.getElementById('popup-config-diario');
-  if (overlay) overlay.style.display = 'none';
-  if (popup) {
-    popup.style.opacity   = '0';
-    popup.style.transform = 'translateY(14px) scale(0.96)';
-    popup.style.pointerEvents = 'none';
-    setTimeout(() => { popup.style.display = 'none'; }, 240);
+function _diarioLimparHistoricoAntigo() {
+  const periodos = _diarioCarregarPeriodos();
+  const agora = new Date();
+  const limite = new Date(agora.getFullYear(), agora.getMonth() - _DIARIO_MAX_HISTORICO, 1);
+  const novos = periodos.filter(function(p) {
+    return _diarioParseData(p.anoFim, p.mesFim, p.diaFim) >= limite;
+  });
+  if (novos.length !== periodos.length) _diarioSalvarPeriodos(novos);
+}
+
+function _diarioGetGrupos() {
+  const periodos = _diarioCarregarPeriodos();
+  periodos.sort(function(a, b) {
+    return _diarioParseData(b.anoIni, b.mesIni, b.diaIni) - _diarioParseData(a.anoIni, a.mesIni, a.diaIni);
+  });
+  const map = {};
+  periodos.forEach(function(p) {
+    const g = p.slotGroup !== undefined ? p.slotGroup : p.id;
+    if (!map[g]) map[g] = [];
+    map[g].push(p);
+  });
+  return Object.values(map).sort(function(a, b) {
+    return _diarioParseData(b[0].anoIni, b[0].mesIni, b[0].diaIni) - _diarioParseData(a[0].anoIni, a[0].mesIni, a[0].diaIni);
+  });
+}
+
+function renderizarDiario() {
+  _diarioLimparHistoricoAntigo();
+  const grupos = _diarioGetGrupos();
+  const vazio  = document.getElementById('diario-vazio-state');
+  const ativo  = document.getElementById('diario-ativo-state');
+  const dataEl = document.getElementById('diario-data-atual');
+  const mesLabel = document.getElementById('diario-mes-label');
+
+  if (dataEl) {
+    const hoje = new Date();
+    const dd = String(hoje.getDate()).padStart(2,'0');
+    const mm = String(hoje.getMonth()+1).padStart(2,'0');
+    dataEl.textContent = 'Hoje: ' + dd + '/' + mm + '/' + hoje.getFullYear();
   }
-}
 
-function salvarConfigDiario() {
-  if (!_configDiarioPending) { fecharConfigDiario(); return; }
-  // Persiste somente ao clicar Salvar
-  localStorage.setItem(_CHAVE_LIMITE_DIARIO_ATIVO, JSON.stringify(_configDiarioPending.ativo));
-  _configDiarioPending = null;
-  // Garante que o DOM do Mensal está atualizado antes de renderizar o Diário
-  carregarMes();
-  fecharConfigDiario();
-  exibirToastInfo('Configurações salvas.', 2500);
-}
-
-// ── LIMITE MENSAL PERSONALIZADO DO DIÁRIO ──────────────────────────────────
-const _CHAVE_LIMITE_DIARIO_ATIVO = 'diario_limite_mensal_ativo';
-const _CHAVE_LIMITE_DIARIO_VALOR = 'diario_limite_mensal_valor';
-
-function getLimiteMensalDiario() {
-  // Padrão: ativo = true (habilitado por padrão)
-  const raw = localStorage.getItem(_CHAVE_LIMITE_DIARIO_ATIVO);
-  const ativo = raw === null ? true : JSON.parse(raw);
-  const valor = parseFloat(localStorage.getItem(_CHAVE_LIMITE_DIARIO_VALOR) || '0');
-  return { ativo, valor };
-}
-
-function _sincronizarToggleLimiteDiario() {
-  // Lê do estado pendente se o popup estiver aberto, caso contrário do localStorage
-  const ativo = _configDiarioPending
-    ? _configDiarioPending.ativo
-    : getLimiteMensalDiario().ativo;
-
-  const toggle = document.getElementById('diario-cfg-toggle');
-  const knob   = document.getElementById('diario-cfg-toggle-knob');
-  const lapis  = document.getElementById('diario-limite-lapis');
-
-  if (toggle) {
-    toggle.style.background = ativo ? '#3a6edc' : '#d0d8ea';
-    if (knob) knob.style.left = ativo ? '19px' : '3px';
+  if (mesLabel) {
+    mesLabel.textContent = meses[indice] + ' ' + anoAtual;
   }
-  // Lápis visível apenas quando toggle está desligado (modo edição manual)
-  if (lapis) lapis.style.display = !ativo ? 'inline-flex' : 'none';
+  _atualizarDiarioTituloMes();
 
-  // Fecha o edit inline se ativou (modo automático não permite editar)
-  if (ativo) cancelarEditeLimiteMensal();
-}
+  // Mostrar apenas períodos com mesRef/anoRef explícito para este mês
+  const gruposMes = grupos.filter(function(g) {
+    return g.some(function(p) {
+      return p.mesRef === indice && p.anoRef === anoAtual;
+    });
+  });
 
-function toggleLimiteMensalDiario() {
-  // Altera apenas o estado pendente — não grava no localStorage até Salvar
-  if (_configDiarioPending) {
-    _configDiarioPending.ativo = !_configDiarioPending.ativo;
-  }
-  _sincronizarToggleLimiteDiario();
-  // Não chama renderizarDiario() aqui — o efeito só ocorre ao salvar
-}
-
-// ── Edição inline do limite mensal (lápis no header do diário) ────────────
-function abrirEditeLimiteMensal() {
-  const input     = document.getElementById('diario-limite-mensal');
-  const lapis     = document.getElementById('diario-limite-lapis');
-  const confirmar = document.getElementById('diario-limite-confirmar');
-  if (!input) return;
-
-  input.readOnly = false;
-  input.classList.add('editando');
-  if (lapis)     lapis.style.display     = 'none';
-  if (confirmar) confirmar.style.display = 'inline-flex';
-
-  const len = input.value.length;
-  input.focus();
-  input.setSelectionRange(len, len);
-}
-
-function confirmarEditeLimiteMensal() {
-  const input     = document.getElementById('diario-limite-mensal');
-  const lapis     = document.getElementById('diario-limite-lapis');
-  const confirmar = document.getElementById('diario-limite-confirmar');
-  if (!input || !input.classList.contains('editando')) return;
-
-  const valor = num(input.value);
-  if (valor <= 0) {
-    input.style.borderBottomColor = '#e74c3c';
-    input.style.color = '#e74c3c';
-    setTimeout(() => { input.style.borderBottomColor = ''; input.style.color = ''; }, 1400);
+  if (gruposMes.length === 0) {
+    if (vazio) vazio.style.display = 'flex';
+    if (ativo) ativo.style.display = 'none';
     return;
   }
 
-  localStorage.setItem(_CHAVE_LIMITE_DIARIO_VALOR, String(valor));
-  input.readOnly = true;
-  input.classList.remove('editando');
-  if (confirmar) confirmar.style.display = 'none';
-  const { ativo } = getLimiteMensalDiario();
-  if (lapis) lapis.style.display = !ativo ? 'inline-flex' : 'none';
-  renderizarDiario();
+  if (vazio) vazio.style.display = 'none';
+  if (ativo) ativo.style.display = 'block';
+
+  if (_diarioPeriodoAtual >= gruposMes.length) _diarioPeriodoAtual = 0;
+
+  const grupo = gruposMes[_diarioPeriodoAtual];
+  const btnPrev = document.getElementById('diario-nav-prev');
+  const btnNext = document.getElementById('diario-nav-next');
+  if (btnPrev) btnPrev.style.opacity = '1';
+  if (btnNext) btnNext.style.opacity = '1';
+
+  // Ordena os períodos do grupo por data de início (mais antiga = esquerda, mais recente = direita)
+  const grupoOrdenado = grupo.slice().sort(function(a, b) {
+    return _diarioParseData(a.anoIni, a.mesIni, a.diaIni) - _diarioParseData(b.anoIni, b.mesIni, b.diaIni);
+  });
+  const slot0 = grupoOrdenado[0] || null;
+  const slot1 = grupoOrdenado[1] || null;
+  const unico = grupoOrdenado.length === 1;
+
+  _diarioRenderizarSlot(0, slot0, unico);
+  _diarioRenderizarSlot(1, slot1, unico);
+
+  const btnAdd = document.getElementById('diario-add-segundo-btn');
+  // Slot livre para cadastro: usa o slot salvo oposto ao existente
+  const slotLivre = slot0 && slot1 ? -1 : (slot0 ? (slot0.slot === 0 ? 1 : 0) : 0);
+  if (btnAdd) {
+    btnAdd.style.display = (unico && _diarioPeriodoAtual === 0) ? 'block' : 'none';
+    btnAdd.onclick = function() { abrirPopupDiarioCadastro(slotLivre >= 0 ? slotLivre : 1, true); };
+  }
 }
 
-function cancelarEditeLimiteMensal() {
-  const input     = document.getElementById('diario-limite-mensal');
-  const lapis     = document.getElementById('diario-limite-lapis');
-  const confirmar = document.getElementById('diario-limite-confirmar');
-  if (!input) return;
+function _diarioRenderizarSlot(slotIdx, periodo, unico) {
+  const wrap = document.getElementById('diario-wrap-' + slotIdx);
+  if (!wrap) return;
 
-  input.readOnly = true;
-  input.classList.remove('editando');
-  input.style.borderBottomColor = '';
-  input.style.color = '';
-  if (confirmar) confirmar.style.display = 'none';
-  const { ativo } = getLimiteMensalDiario();
-  if (lapis) lapis.style.display = !ativo ? 'inline-flex' : 'none';
-  // Não chama renderizarDiario() aqui — evita recursão via _sincronizarToggleLimiteDiario
+  if (!periodo) { wrap.style.display = 'none'; return; }
+
+  wrap.style.display = '';
+  const encerrado = _diarioPeriodoEncerrado(periodo);
+  wrap.style.opacity = encerrado ? '0.72' : '1';
+  wrap.style.filter  = encerrado ? 'grayscale(0.3)' : '';
+  if (unico) wrap.classList.add('unico'); else wrap.classList.remove('unico');
+
+  const colunas = document.getElementById('diario-colunas');
+  if (colunas) colunas.style.justifyContent = unico ? 'center' : 'flex-start';
+
+  const _NM  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const _NMC = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const labelEl = document.getElementById('diario-periodo-label-' + slotIdx);
+  if (labelEl) {
+    const dIni = String(periodo.diaIni).padStart(2,'0');
+    const dFim = String(periodo.diaFim).padStart(2,'0');
+    const mesmoMes = periodo.mesIni === periodo.mesFim && periodo.anoIni === periodo.anoFim;
+    if (mesmoMes) {
+      labelEl.textContent = dIni + ' ' + _NMC[periodo.mesIni] + ' → ' + dFim + ' ' + _NMC[periodo.mesFim] + ' ' + periodo.anoIni;
+    } else {
+      labelEl.textContent = dIni + ' ' + _NMC[periodo.mesIni] + ' → ' + dFim + ' ' + _NMC[periodo.mesFim] + ' ' + periodo.anoFim;
+    }
+  }
+  const valorEl = document.getElementById('diario-periodo-valor-' + slotIdx);
+  if (valorEl) valorEl.textContent = brl(periodo.valor);
+
+  // Setar onclick dos botões com o id real do período (evita bug de slot)
+  const btnEdit = wrap.querySelector('.diario-periodo-btn-edit');
+  const btnDel  = wrap.querySelector('.diario-periodo-btn-del');
+  if (btnEdit) btnEdit.onclick = function() { confirmarExcluirPeriodoDiarioById(periodo.id, true); };
+  if (btnDel)  btnDel.onclick  = function() { confirmarExcluirPeriodoDiarioById(periodo.id, false); };
+
+  const encEl    = document.getElementById('diario-encerrado-' + slotIdx);
+  const sobrouEl = document.getElementById('diario-sobrou-' + slotIdx);
+  if (encEl) encEl.style.display = encerrado ? 'flex' : 'none';
+
+  const ini = _diarioParseData(periodo.anoIni, periodo.mesIni, periodo.diaIni);
+  const fim = _diarioParseData(periodo.anoFim, periodo.mesFim, periodo.diaFim);
+  const totalDias = _diarioDiffDias(ini, fim) + 1;
+  const limiteDiario = totalDias > 0 ? periodo.valor / totalDias : 0;
+
+  const tbody = document.getElementById('diario-tbody-' + slotIdx);
+  tbody.innerHTML = '';
+
+  let dispAcum  = 0;
+  let totalSaida = 0;
+  const diasSemana = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const cur = new Date(ini);
+
+  while (cur <= fim) {
+    const ano = cur.getFullYear(), mes = cur.getMonth(), dia = cur.getDate();
+    const saidaStr = _diarioCarregarSaida(periodo.id, ano, mes, dia);
+    const saidaVal = saidaStr ? num(saidaStr) : 0;
+    dispAcum  += limiteDiario - saidaVal;
+    totalSaida += saidaVal;
+
+    const tr = document.createElement('tr');
+    const hoje = new Date();
+    if (ano === hoje.getFullYear() && mes === hoje.getMonth() && dia === hoje.getDate()) {
+      tr.classList.add('diario-row-hoje');
+    }
+    const tdData = document.createElement('td');
+    tdData.textContent = String(dia).padStart(2,'0') + '/' + String(mes+1).padStart(2,'0') + '/' + ano;
+    tr.appendChild(tdData);
+    const tdDia = document.createElement('td');
+    tdDia.textContent = diasSemana[cur.getDay()];
+    tr.appendChild(tdDia);
+    const tdDisp = document.createElement('td');
+    tdDisp.className = 'diario-td-disponivel' + (dispAcum < 0 ? ' negativo' : '');
+    tdDisp.textContent = brl(dispAcum);
+    if (dispAcum >= 0 && periodo.valor > 0) {
+      const ratio = Math.min(dispAcum / periodo.valor, 1);
+      const lightness = Math.round(72 - ratio * 36); // 72% (claro) → 36% (escuro)
+      tdDisp.style.color = 'hsl(120,' + Math.round(40 + ratio * 30) + '%,' + lightness + '%)';
+    }
+    tr.appendChild(tdDisp);
+    const tdSaida = document.createElement('td');
+
+    if (!encerrado) {
+      const cel = document.createElement('div');
+      cel.className = 'diario-saida-cel';
+
+      const input = document.createElement('input');
+      input.type = 'text'; input.className = 'diario-saida-input';
+      input.placeholder = 'R$ 0,00'; input.autocomplete = 'off';
+      if (saidaStr) input.value = saidaStr;
+      input.dataset.ano = ano; input.dataset.mes = mes; input.dataset.dia = dia;
+      input.dataset.pid = periodo.id;
+      input.addEventListener('input', function() { fmtInput(this); });
+      input.addEventListener('blur', function() {
+        fmt(this);
+        _diarioSalvarSaida(this.dataset.pid, parseInt(this.dataset.ano), parseInt(this.dataset.mes), parseInt(this.dataset.dia), this.value);
+        renderizarDiario();
+      });
+      input.addEventListener('keydown', function(e) { if (e.key === 'Enter') this.blur(); });
+
+      const btnLimpar = document.createElement('button');
+      btnLimpar.className = 'diario-limpar-saida';
+      btnLimpar.textContent = '×';
+      btnLimpar.title = 'Limpar saída';
+      (function(pid, a, m, d){ btnLimpar.addEventListener('click', function() { _diarioSalvarSaida(pid, a, m, d, ''); renderizarDiario(); }); })(periodo.id, ano, mes, dia);
+
+      cel.appendChild(input);
+      cel.appendChild(btnLimpar);
+      tdSaida.appendChild(cel);
+    } else {
+      const span = document.createElement('span');
+      span.textContent = saidaStr || 'R$ 0,00';
+      span.style.cssText = 'font-size:12px;color:#8a9cc8;';
+      tdSaida.appendChild(span);
+    }
+    tr.appendChild(tdSaida);
+    tbody.appendChild(tr);
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  const totalDispEl = document.getElementById('diario-total-disp-' + slotIdx);
+  totalDispEl.textContent = brl(dispAcum);
+  totalDispEl.style.color = dispAcum < 0 ? '#ff7f7f' : '#6effa0';
+  document.getElementById('diario-total-saida-' + slotIdx).textContent = brl(totalSaida);
+
+  if (encEl && sobrouEl && encerrado) {
+    const sobrado = Math.max(0, periodo.valor - totalSaida);
+    sobrouEl.textContent = sobrado > 0.004 ? 'Sobrou: ' + brl(sobrado) : '';
+    // Botão devolver: aparece só se houver sobrado e ainda não foi devolvido
+    const btnDevolver = document.getElementById('diario-devolver-' + slotIdx);
+    if (btnDevolver) {
+      const jaDevolveu = periodo._devolveu || false;
+      btnDevolver.style.display = (sobrado > 0.004 && !jaDevolveu) ? 'inline-flex' : 'none';
+      btnDevolver.dataset.periodoId = periodo.id;
+      btnDevolver.dataset.sobrado   = sobrado.toFixed(2);
+    }
+  }
+}
+
+function devolverSobradoDiario(slotIdx) {
+  const btn = document.getElementById('diario-devolver-' + slotIdx);
+  if (!btn) return;
+  const periodoId = btn.dataset.periodoId;
+  const sobrado   = parseFloat(btn.dataset.sobrado || '0');
+  if (!periodoId || sobrado <= 0.004) return;
+
+  // Busca o período para saber qual entrada e o valor original alocado
+  const periodos = _diarioCarregarPeriodos();
+  const idx = periodos.findIndex(function(p) { return p.id === periodoId; });
+  if (idx < 0) return;
+  const periodo = periodos[idx];
+
+  // Marca o período como devolvido e reduz o valor alocado para o que foi realmente gasto
+  // (valor original - sobrado = gasto real). Isso faz _alocE1/_alocE2 no recalc
+  // refletir apenas o que foi de fato consumido, corrigindo badge e subtotal automaticamente.
+  const valorGasto = Math.max(0, (periodo.valor || 0) - sobrado);
+  periodos[idx]._devolveu  = true;
+  periodos[idx].valor      = valorGasto; // alocação passa a ser só o gasto real
+  _diarioSalvarPeriodos(periodos); // recalcula _alocE1/_alocE2 internamente
+
+  btn.style.display = 'none';
+  const sobrouEl = document.getElementById('diario-sobrou-' + slotIdx);
+  if (sobrouEl) sobrouEl.textContent = 'Devolvido: ' + brl(sobrado);
+
+  recalc();
+}
+
+function diarioNavegar(dir) {
+  _diarioPeriodoAtual = 0;
+  clearTimeout(window._diarioNavTimeout);
+  window._diarioNavTimeout = setTimeout(function() {
+    changeMonth(dir);
+  }, 80);
+}
+
+// ── INTEGRAÇÃO ENTRADA MENSAL → DIÁRIO ──────────────────────────────────────
+
+let _diarioEntradaSelecionada = 0; // 0 = nenhuma, 1 ou 2
+
+function _diarioGetAlocacoesMes(ano, mes) {
+  const raw = localStorage.getItem(_DIARIO_CHAVE_ALOCACAO);
+  const all = raw ? JSON.parse(raw) : {};
+  return all[ano + '_' + mes] || { '1': 0, '2': 0 };
+}
+
+function _diarioSalvarAlocacaoMes(ano, mes, e1, e2) {
+  const raw = localStorage.getItem(_DIARIO_CHAVE_ALOCACAO);
+  const all = raw ? JSON.parse(raw) : {};
+  all[ano + '_' + mes] = { '1': e1, '2': e2 };
+  localStorage.setItem(_DIARIO_CHAVE_ALOCACAO, JSON.stringify(all));
+}
+
+function _diarioLivreEntrada(entradaNum, excluirPeriodoId) {
+  const sal1 = num(document.getElementById('sal1').value);
+  const sal2 = num(document.getElementById('sal2').value);
+  const sal = entradaNum === 1 ? sal1 : sal2;
+  const sub1 = (function(){ let t=0; document.getElementById('coluna1-wrapper') && document.getElementById('coluna1-wrapper').querySelectorAll('.val-input').forEach(function(i){ t+=num(i.value); }); return t; })();
+  const sub2 = (function(){ let t=0; document.getElementById('coluna2-wrapper') && document.getElementById('coluna2-wrapper').querySelectorAll('.val-input').forEach(function(i){ t+=num(i.value); }); return t; })();
+  const sub = entradaNum === 1 ? sub1 : sub2;
+
+  // Total de desconto (reserva + metas) — líquido real
+  const depRes = parseFloat(localStorage.getItem('dep_reserva_' + anoAtual + '_' + indice) || '0');
+  let depMeta = 0;
+  _META_KEYS.forEach(function(_, si) {
+    depMeta += parseFloat(localStorage.getItem('dep_meta_' + si + '_' + anoAtual + '_' + indice) || '0');
+  });
+  const totalDesconto = depRes + depMeta;
+
+  // Lê distribuição por bloco — idêntico ao recalc
+  const blocosRaw = localStorage.getItem('mov_previsao_blocos_' + anoAtual + '_' + indice);
+  const blocos    = blocosRaw ? JSON.parse(blocosRaw) : {};
+  const depB1 = parseFloat(blocos.depB1 || 0);
+  const depB2 = parseFloat(blocos.depB2 || 0);
+  const retB1 = parseFloat(blocos.retB1 || 0);
+  const retB2 = parseFloat(blocos.retB2 || 0);
+  const liqB1 = depB1 - retB1;
+  const liqB2 = depB2 - retB2;
+  const temBlocos = (depB1 + depB2 + retB1 + retB2) > 0.004;
+
+  const livreE1bruto = sal1 - sub1;
+  const livreE2bruto = sal2 - sub2;
+
+  let descontoE1, descontoE2;
+  if (temBlocos) {
+    if (liqB1 >= 0 && liqB2 >= 0) {
+      descontoE1 = liqB1;
+      descontoE2 = liqB2;
+      const restoDesconto = Math.max(0, totalDesconto - (liqB1 + liqB2));
+      if (restoDesconto > 0.004) {
+        const l1rest = Math.max(0, livreE1bruto - descontoE1);
+        const l2rest = Math.max(0, livreE2bruto - descontoE2);
+        descontoE1 += Math.min(restoDesconto, l1rest);
+        descontoE2 += Math.min(restoDesconto - Math.min(restoDesconto, l1rest), l2rest);
+      }
+    } else {
+      descontoE1 = liqB1;
+      descontoE2 = liqB2;
+      const restoDesconto = Math.max(0, totalDesconto - Math.max(0, liqB1) - Math.max(0, liqB2));
+      if (restoDesconto > 0.004) {
+        const l1rest = Math.max(0, livreE1bruto - Math.max(0, descontoE1));
+        const l2rest = Math.max(0, livreE2bruto - Math.max(0, descontoE2));
+        descontoE1 += Math.min(restoDesconto, l1rest);
+        descontoE2 += Math.min(restoDesconto - Math.min(restoDesconto, l1rest), l2rest);
+      }
+    }
+  } else {
+    descontoE1 = Math.min(totalDesconto, Math.max(0, livreE1bruto));
+    descontoE2 = Math.min(totalDesconto - descontoE1, Math.max(0, livreE2bruto));
+  }
+  const desconto = entradaNum === 1 ? descontoE1 : descontoE2;
+
+  // Alocações já usadas por períodos desta entrada neste mês (exceto o que está sendo editado)
+  const periodos = _diarioCarregarPeriodos();
+  let alocUsada = 0;
+  periodos.forEach(function(p) {
+    if (p.mesRef === indice && p.anoRef === anoAtual && p.entrada === entradaNum && p.id !== excluirPeriodoId) {
+      alocUsada += p.valor;
+    }
+  });
+
+  return sal - sub - desconto - alocUsada;
+}
+
+let _diarioValorMax = Infinity; // máximo permitido no input de valor do período
+
+function _diarioEntradaJaUsada(entradaNum) {
+  // Retorna o período existente neste mês para essa entrada, exceto o que está sendo editado
+  const tituloEl = document.getElementById('popup-diario-titulo');
+  const editId = tituloEl ? tituloEl.dataset.editId : null;
+  const periodos = _diarioCarregarPeriodos();
+  return periodos.find(function(p) {
+    return p.mesRef === indice && p.anoRef === anoAtual && p.entrada === entradaNum && p.id !== editId;
+  }) || null;
+}
+
+function _diarioSelecionarEntrada(num) {
+  const jaUsado = _diarioEntradaJaUsada(num);
+  if (jaUsado) {
+    // Não seleciona — mantém nenhuma seleção ativa e mostra mensagem de bloqueio
+    _diarioEntradaSelecionada = 0;
+    document.getElementById('popup-diario-entrada-1').classList.remove('ativo');
+    document.getElementById('popup-diario-entrada-2').classList.remove('ativo');
+    _diarioValorMax = 0;
+    const infoEl = document.getElementById('popup-diario-entrada-info');
+    if (infoEl) {
+      infoEl.textContent = 'Esta entrada já possui um período neste mês. Feche e edite o período existente.';
+      infoEl.style.color = '#c0392b';
+    }
+    return;
+  }
+  _diarioEntradaSelecionada = num;
+  document.getElementById('popup-diario-entrada-1').classList.toggle('ativo', num === 1);
+  document.getElementById('popup-diario-entrada-2').classList.toggle('ativo', num === 2);
+  _diarioAtualizarInfoEntrada();
+}
+
+function _diarioAtualizarInfoEntrada() {
+  const infoEl = document.getElementById('popup-diario-entrada-info');
+  if (!infoEl) return;
+  const tituloEl = document.getElementById('popup-diario-titulo');
+  const editId = tituloEl ? tituloEl.dataset.editId : null;
+  const sal1 = num(document.getElementById('sal1').value);
+  const sal2 = num(document.getElementById('sal2').value);
+  if (sal1 === 0 && sal2 === 0) {
+    infoEl.textContent = 'Nenhum salário informado na página mensal.';
+    infoEl.style.color = '#c0392b';
+    return;
+  }
+  if (_diarioEntradaSelecionada === 0) {
+    infoEl.textContent = 'Selecione uma entrada para ver o saldo disponível.';
+    infoEl.style.color = '#8a9cc8';
+    return;
+  }
+  const salEntrada = _diarioEntradaSelecionada === 1 ? sal1 : sal2;
+  if (salEntrada === 0) {
+    infoEl.textContent = 'Esta entrada não tem salário informado.';
+    infoEl.style.color = '#c0392b';
+    return;
+  }
+  const livre = _diarioLivreEntrada(_diarioEntradaSelecionada, editId || null);
+  _diarioValorMax = livre > 0 ? livre : 0;
+  // Clamp imediato: se já há valor digitado que excede o novo máximo, ajusta
+  const valInp = document.getElementById('popup-diario-valor');
+  if (valInp && _diarioValorMax < Infinity) {
+    const digited = num(valInp.value);
+    if (digited > _diarioValorMax) valInp.value = _diarioValorMax > 0 ? brl(_diarioValorMax) : '';
+  }
+  if (livre <= 0) {
+    infoEl.textContent = 'Sem saldo disponível nesta entrada para este mês.';
+    infoEl.style.color = '#c0392b';
+  } else {
+    infoEl.textContent = 'Disponível: ' + brl(livre);
+    infoEl.style.color = '#2e7d32';
+  }
+}
+
+function fmtDiarioValor(input) {
+  fmtInput(input);
+  if (_diarioValorMax < Infinity && _diarioValorMax >= 0) {
+    const v = num(input.value);
+    if (v > _diarioValorMax) {
+      input.value = _diarioValorMax > 0 ? brl(_diarioValorMax) : '';
+      try { const len = input.value.length; input.setSelectionRange(len, len); } catch(e) {}
+    }
+  }
+}
+
+function _diarioPopupInicializar() {
+  if (window._diarioPopupJaInicializado) return;
+  window._diarioPopupJaInicializado = true;
+  // Garante que colagem no campo de valor também respeita o limite máximo
+  const _dvInp = document.getElementById('popup-diario-valor');
+  if (_dvInp) {
+    _dvInp.addEventListener('paste', function() {
+      setTimeout(function() { fmtDiarioValor(_dvInp); }, 0);
+    });
+  }
+  const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  // Preenche lista de dias (1-31) para ini e fim
+  ['ini','fim'].forEach(function(tipo) {
+    const listEl = document.getElementById('popup-diario-dia-' + tipo + '-list');
+    if (!listEl || listEl.children.length > 0) return;
+    for (let d = 1; d <= 31; d++) {
+      const item = document.createElement('div');
+      item.className = 'popup-meta-drop-item';
+      item.dataset.val = d;
+      item.textContent = String(d).padStart(2,'0');
+      listEl.appendChild(item);
+    }
+  });
+
+  // Preenche lista de meses do início: apenas mês atual da mensal + próximo
+  const mesIniList = document.getElementById('popup-diario-mes-ini-list');
+  mesIniList.innerHTML = '';
+  const mesesPermitidos = [indice % 12, (indice + 1) % 12];
+  mesesPermitidos.forEach(function(idx) {
+    const item = document.createElement('div');
+    item.className = 'popup-meta-drop-item';
+    item.dataset.val = idx;
+    item.textContent = nomesMes[idx];
+    mesIniList.appendChild(item);
+  });
+
+  // Lista de meses do fim começa vazia — preenchida dinamicamente por _diarioAtualizarMesesFim
+  const mesFimList = document.getElementById('popup-diario-mes-fim-list');
+  if (mesFimList) mesFimList.innerHTML = '';
+
+  // Função que recalcula os meses disponíveis no "até" com base na data de início (máx 31 dias)
+  window._diarioAtualizarMesesFim = function() {
+    const diaIniVal = document.getElementById('popup-diario-dia-ini').value;
+    const mesIniVal = document.getElementById('popup-diario-mes-ini').value;
+    if (diaIniVal === '' || mesIniVal === '') return;
+    const anoBase = anoAtual;
+    const dataIni = new Date(anoBase, parseInt(mesIniVal), parseInt(diaIniVal));
+    const dataMax = new Date(dataIni.getTime() + 31 * 24 * 60 * 60 * 1000);
+    const mesFimAtual = document.getElementById('popup-diario-mes-fim').value;
+    const list = document.getElementById('popup-diario-mes-fim-list');
+    list.innerHTML = '';
+    const mesInicio = dataIni.getMonth();
+    const mesFimCalc = dataMax.getMonth();
+    const anoFim = dataMax.getFullYear();
+    // Limitar ao máximo mês atual + 1
+    const limiteMax = (indice + 1) % 12;
+    let mesesValidos = [];
+    if (anoFim === anoBase) {
+      for (let m = mesInicio; m <= mesFimCalc; m++) {
+        if (mesesPermitidos.includes(m)) mesesValidos.push(m);
+      }
+    } else {
+      for (let m = mesInicio; m <= 11; m++) {
+        if (mesesPermitidos.includes(m)) mesesValidos.push(m);
+      }
+      for (let m = 0; m <= mesFimCalc; m++) {
+        if (mesesPermitidos.includes(m)) mesesValidos.push(m);
+      }
+    }
+    // Garante que ao menos o mês de início aparece
+    if (!mesesValidos.includes(mesInicio)) mesesValidos.unshift(mesInicio);
+    mesesValidos.forEach(function(m) {
+      const item = document.createElement('div');
+      item.className = 'popup-meta-drop-item';
+      item.dataset.val = m;
+      item.textContent = nomesMes[m];
+      if (String(m) === mesFimAtual) item.classList.add('ativo');
+      list.appendChild(item);
+    });
+    // Se o mês fim selecionado não é mais válido, resetar
+    if (mesFimAtual !== '' && !mesesValidos.includes(parseInt(mesFimAtual))) {
+      document.getElementById('popup-diario-mes-fim').value = '';
+      document.getElementById('popup-diario-mes-fim-display').value = '';
+      document.getElementById('popup-diario-mes-fim-display').placeholder = 'Mês';
+    }
+  };
+
+  // Configura cada campo como input com autocomplete + dropdown
+  [
+    { displayId: 'popup-diario-dia-ini-display',  listId: 'popup-diario-dia-ini-list',  hiddenId: 'popup-diario-dia-ini',  isDia: true,  isFim: false },
+    { displayId: 'popup-diario-mes-ini-display',  listId: 'popup-diario-mes-ini-list',  hiddenId: 'popup-diario-mes-ini',  isDia: false, isFim: false },
+    { displayId: 'popup-diario-dia-fim-display',  listId: 'popup-diario-dia-fim-list',  hiddenId: 'popup-diario-dia-fim',  isDia: true,  isFim: true  },
+    { displayId: 'popup-diario-mes-fim-display',  listId: 'popup-diario-mes-fim-list',  hiddenId: 'popup-diario-mes-fim',  isDia: false, isFim: true  },
+  ].forEach(function(cfg) {
+    const display = document.getElementById(cfg.displayId);
+    const list    = document.getElementById(cfg.listId);
+    const hidden  = document.getElementById(cfg.hiddenId);
+    if (!display || !list || !hidden) return;
+
+    var _digitando = false;
+
+    function abrirLista(filtrar) {
+      // Só filtra se o usuário está digitando ativamente
+      const q = (filtrar && _digitando) ? display.value.toLowerCase().trim() : '';
+      list.querySelectorAll('.popup-meta-drop-item').forEach(function(item) {
+        const match = item.textContent.toLowerCase().includes(q) || q === '';
+        item.style.display = match ? '' : 'none';
+      });
+      document.querySelectorAll('#popup-diario .popup-meta-drop-list.open').forEach(function(el) {
+        if (el !== list) el.classList.remove('open');
+      });
+      list.classList.add('open');
+    }
+
+    display.addEventListener('focus', function() {
+      _digitando = false;
+      abrirLista(false);
+    });
+    display.addEventListener('input', function() {
+      // Filtra caracteres inválidos na digitação
+      if (cfg.isDia) {
+        // Campos de dia: apenas dígitos
+        const limpo = display.value.replace(/\D/g, '');
+        if (display.value !== limpo) { display.value = limpo; }
+      } else {
+        // Campos de mês: apenas letras e espaços
+        const limpo = display.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+        if (display.value !== limpo) { display.value = limpo; }
+      }
+      _digitando = true;
+      hidden.value = '';
+      list.querySelectorAll('.popup-meta-drop-item').forEach(function(i){ i.classList.remove('ativo'); });
+      // Para campo de dia: se digitou número válido, já seleciona
+      if (cfg.isDia) {
+        const num = parseInt(display.value);
+        if (!isNaN(num) && num >= 1 && num <= 31) {
+          const match = list.querySelector('.popup-meta-drop-item[data-val="' + num + '"]');
+          if (match) {
+            hidden.value = num;
+            match.classList.add('ativo');
+            if (!cfg.isFim) window._diarioAtualizarMesesFim && window._diarioAtualizarMesesFim();
+          }
+        }
+      }
+      abrirLista(true);
+    });
+    display.addEventListener('click', function(e) { e.stopPropagation(); _digitando = false; abrirLista(false); });
+
+    list.addEventListener('click', function(e) {
+      const item = e.target.closest('.popup-meta-drop-item');
+      if (!item) return;
+      const val = item.dataset.val;
+      hidden.value = val;
+      display.value = cfg.isDia ? String(parseInt(val)).padStart(2,'0') : nomesMes[parseInt(val)];
+      list.querySelectorAll('.popup-meta-drop-item').forEach(function(i){ i.classList.remove('ativo'); });
+      item.classList.add('ativo');
+      list.classList.remove('open');
+      // Atualiza meses do fim sempre que início muda
+      if (!cfg.isFim) window._diarioAtualizarMesesFim && window._diarioAtualizarMesesFim();
+    });
+  });
+
+  document.addEventListener('click', function() {
+    document.querySelectorAll('#popup-diario .popup-meta-drop-list.open').forEach(function(el) {
+      el.classList.remove('open');
+    });
+  });
+}
+
+function _diarioDropdownSet(displayId, listId, hiddenId, val, label) {
+  const display = document.getElementById(displayId);
+  const list    = document.getElementById(listId);
+  const hidden  = document.getElementById(hiddenId);
+  if (!display || !hidden) return;
+  hidden.value = val;
+  // Suporta tanto input quanto div
+  if (display.tagName === 'INPUT') {
+    display.value = label;
+  } else {
+    display.textContent = label;
+    display.classList.remove('vazio');
+  }
+  if (list) {
+    list.querySelectorAll('.popup-meta-drop-item').forEach(function(i){
+      i.classList.toggle('ativo', i.dataset.val == val);
+    });
+  }
+  // Após setar início, atualiza meses do fim
+  if ((hiddenId === 'popup-diario-dia-ini' || hiddenId === 'popup-diario-mes-ini') && window._diarioAtualizarMesesFim) {
+    window._diarioAtualizarMesesFim();
+  }
+}
+
+function _diarioDropdownReset(displayId, hiddenId, placeholder) {
+  const display = document.getElementById(displayId);
+  const hidden  = document.getElementById(hiddenId);
+  if (display) {
+    if (display.tagName === 'INPUT') { display.value = ''; display.placeholder = placeholder; }
+    else { display.textContent = placeholder; display.classList.add('vazio'); }
+  }
+  if (hidden) hidden.value = '';
+}
+
+function _diarioGetDropVal(hiddenId) {
+  const el = document.getElementById(hiddenId);
+  return el ? el.value : '';
+}
+
+let _diarioSegundoSlot = false; // true apenas quando cadastrando o segundo slot de um grupo existente
+
+function _abrirPopupDiarioTour() {
+  // Abre o popup silenciosamente para o tour — sem validações de salário
+  _diarioValorMax = Infinity;
+  _diarioSlotEditando = 0;
+  _diarioSegundoSlot = false;
+  window._diarioPopupJaInicializado = false;
+  _diarioPopupInicializar();
+  _diarioDropdownReset('popup-diario-dia-ini-display','popup-diario-dia-ini','Dia');
+  _diarioDropdownReset('popup-diario-mes-ini-display','popup-diario-mes-ini','Mês');
+  _diarioDropdownReset('popup-diario-dia-fim-display','popup-diario-dia-fim','Dia');
+  _diarioDropdownReset('popup-diario-mes-fim-display','popup-diario-mes-fim','Mês');
+  document.getElementById('popup-diario-valor').value = '';
+  document.getElementById('popup-diario-erro').style.display = 'none';
+  document.getElementById('popup-diario-titulo').textContent = 'Cadastrar período';
+  delete document.getElementById('popup-diario-titulo').dataset.editId;
+  _diarioEntradaSelecionada = 0;
+  document.getElementById('popup-diario-entrada-1').classList.remove('ativo');
+  document.getElementById('popup-diario-entrada-2').classList.remove('ativo');
+  // Limpa a mensagem de info sem chamar _diarioAtualizarInfoEntrada
+  const infoEl = document.getElementById('popup-diario-entrada-info');
+  if (infoEl) { infoEl.textContent = ''; infoEl.style.color = ''; infoEl.style.display = 'none'; infoEl.style.height = ''; infoEl.style.margin = ''; }
+  _abrirPopupDiario();
+}
+
+function abrirPopupDiarioCadastro(slot, segundoSlot) {
+  _diarioValorMax = Infinity;
+  _diarioSlotEditando = slot;
+  _diarioSegundoSlot = !!segundoSlot;
+  window._diarioPopupJaInicializado = false;
+  _diarioPopupInicializar();
+  _diarioDropdownReset('popup-diario-dia-ini-display','popup-diario-dia-ini','Dia');
+  _diarioDropdownReset('popup-diario-mes-ini-display','popup-diario-mes-ini','Mês');
+  _diarioDropdownReset('popup-diario-dia-fim-display','popup-diario-dia-fim','Dia');
+  _diarioDropdownReset('popup-diario-mes-fim-display','popup-diario-mes-fim','Mês');
+  document.getElementById('popup-diario-valor').value = '';
+  document.getElementById('popup-diario-erro').style.display = 'none';
+  document.getElementById('popup-diario-titulo').textContent = 'Cadastrar período';
+  delete document.getElementById('popup-diario-titulo').dataset.editId;
+  _diarioEntradaSelecionada = 0;
+  document.getElementById('popup-diario-entrada-1').classList.remove('ativo');
+  document.getElementById('popup-diario-entrada-2').classList.remove('ativo');
+  // Limpa estilos inline que o tour possa ter deixado no infoEl
+  const _infoElCad = document.getElementById('popup-diario-entrada-info');
+  if (_infoElCad) { _infoElCad.style.display = ''; _infoElCad.style.height = ''; _infoElCad.style.margin = ''; }
+  _diarioAtualizarInfoEntrada();
+  _abrirPopupDiario();
+}
+
+function abrirPopupDiarioEditarById(periodoId) {
+  const periodo = _diarioCarregarPeriodos().find(function(p){ return p.id === periodoId; });
+  if (!periodo) return;
+  _diarioSlotEditando = periodo.slot;
+  window._diarioPopupJaInicializado = false;
+  _diarioPopupInicializar();
+  const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  _diarioDropdownSet('popup-diario-dia-ini-display','popup-diario-dia-ini-list','popup-diario-dia-ini', periodo.diaIni, String(periodo.diaIni).padStart(2,'0'));
+  _diarioDropdownSet('popup-diario-mes-ini-display','popup-diario-mes-ini-list','popup-diario-mes-ini', periodo.mesIni, nomesMes[periodo.mesIni]);
+  _diarioDropdownSet('popup-diario-dia-fim-display','popup-diario-dia-fim-list','popup-diario-dia-fim', periodo.diaFim, String(periodo.diaFim).padStart(2,'0'));
+  _diarioDropdownSet('popup-diario-mes-fim-display','popup-diario-mes-fim-list','popup-diario-mes-fim', periodo.mesFim, nomesMes[periodo.mesFim]);
+  document.getElementById('popup-diario-valor').value = brl(periodo.valor);
+  document.getElementById('popup-diario-erro').style.display = 'none';
+  document.getElementById('popup-diario-titulo').textContent = 'Editar período';
+  document.getElementById('popup-diario-titulo').dataset.editId = periodo.id;
+  _diarioEntradaSelecionada = periodo.entrada || 0;
+  document.getElementById('popup-diario-entrada-1').classList.toggle('ativo', _diarioEntradaSelecionada === 1);
+  document.getElementById('popup-diario-entrada-2').classList.toggle('ativo', _diarioEntradaSelecionada === 2);
+  // Limpa estilos inline que o tour possa ter deixado no infoEl
+  const _infoElEd = document.getElementById('popup-diario-entrada-info');
+  if (_infoElEd) { _infoElEd.style.display = ''; _infoElEd.style.height = ''; _infoElEd.style.margin = ''; }
+  _diarioAtualizarInfoEntrada();
+  _abrirPopupDiario();
+}
+
+function abrirPopupDiarioEditar(slot) {
+  const grupos  = _diarioGetGrupos();
+  const gruposMes = grupos.filter(function(g) {
+    return g.some(function(p) { return p.mesRef === indice && p.anoRef === anoAtual; });
+  });
+  const grupo = gruposMes[_diarioPeriodoAtual];
+  if (!grupo) return;
+  const periodo = grupo.find(function(p){ return p.slot === slot; }) || null;
+  if (!periodo) return;
+  _diarioSlotEditando = slot;
+  window._diarioPopupJaInicializado = false;
+  _diarioPopupInicializar();
+  const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  _diarioDropdownSet('popup-diario-dia-ini-display','popup-diario-dia-ini-list','popup-diario-dia-ini', periodo.diaIni, String(periodo.diaIni).padStart(2,'0'));
+  _diarioDropdownSet('popup-diario-mes-ini-display','popup-diario-mes-ini-list','popup-diario-mes-ini', periodo.mesIni, nomesMes[periodo.mesIni]);
+  _diarioDropdownSet('popup-diario-dia-fim-display','popup-diario-dia-fim-list','popup-diario-dia-fim', periodo.diaFim, String(periodo.diaFim).padStart(2,'0'));
+  _diarioDropdownSet('popup-diario-mes-fim-display','popup-diario-mes-fim-list','popup-diario-mes-fim', periodo.mesFim, nomesMes[periodo.mesFim]);
+  document.getElementById('popup-diario-valor').value = brl(periodo.valor);
+  document.getElementById('popup-diario-erro').style.display = 'none';
+  document.getElementById('popup-diario-titulo').textContent = 'Editar período';
+  document.getElementById('popup-diario-titulo').dataset.editId = periodo.id;
+  _diarioEntradaSelecionada = periodo.entrada || 0;
+  document.getElementById('popup-diario-entrada-1').classList.toggle('ativo', _diarioEntradaSelecionada === 1);
+  document.getElementById('popup-diario-entrada-2').classList.toggle('ativo', _diarioEntradaSelecionada === 2);
+  _diarioAtualizarInfoEntrada();
+  _abrirPopupDiario();
+}
+
+function _abrirPopupDiario() {
+  const overlay = document.getElementById('popup-diario-overlay');
+  const popup   = document.getElementById('popup-diario');
+  overlay.style.display = 'block';
+  popup.style.display   = 'block';
+  requestAnimationFrame(function() {
+    popup.style.opacity = '1';
+    popup.style.transform = 'translate(-50%,-50%) scale(1)';
+    popup.style.pointerEvents = 'all';
+  });
+}
+
+function fecharPopupDiario() {
+  const overlay = document.getElementById('popup-diario-overlay');
+  const popup   = document.getElementById('popup-diario');
+  popup.style.opacity = '0';
+  popup.style.transform = 'translate(-50%,-50%) scale(0.94)';
+  popup.style.pointerEvents = 'none';
+  setTimeout(function() { popup.style.display = 'none'; overlay.style.display = 'none'; }, 200);
+}
+
+function salvarPopupDiario() {
+  const erroEl  = document.getElementById('popup-diario-erro');
+  erroEl.style.display = 'none';
+  const anoSistema = new Date().getFullYear();
+  const diaIniStr = _diarioGetDropVal('popup-diario-dia-ini');
+  const mesIniStr = _diarioGetDropVal('popup-diario-mes-ini');
+  const diaFimStr = _diarioGetDropVal('popup-diario-dia-fim');
+  const mesFimStr = _diarioGetDropVal('popup-diario-mes-fim');
+  const diaIni  = diaIniStr !== '' ? parseInt(diaIniStr) : 0;
+  const mesIni  = mesIniStr !== '' ? parseInt(mesIniStr) : -1;
+  const diaFim  = diaFimStr !== '' ? parseInt(diaFimStr) : 0;
+  const mesFim  = mesFimStr !== '' ? parseInt(mesFimStr) : -1;
+  const anoIni  = anoSistema;
+  const anoFim  = mesFim < mesIni ? anoSistema + 1 : anoSistema;
+  const valor   = num(document.getElementById('popup-diario-valor').value);
+
+  function erro(msg) { erroEl.textContent = msg; erroEl.style.display = 'block'; }
+
+  const iniDate = _diarioParseData(anoIni, mesIni, diaIni);
+  const fimDate = _diarioParseData(anoFim, mesFim, diaFim);
+
+  const periodos = _diarioCarregarPeriodos();
+  const tituloEl = document.getElementById('popup-diario-titulo');
+  const editId   = tituloEl.dataset.editId;
+  const isEdit   = !!editId;
+
+  if (!diaIni || mesIni < 0 || !diaFim || mesFim < 0 || valor <= 0) { erro('Preencha todos os campos corretamente.'); return; }
+  if (_diarioEntradaSelecionada === 0) { erro('Selecione a entrada vinculada a este período.'); return; }
+  // Verifica se já existe período neste mês com essa entrada (exceto ao editar)
+  const _entradaOcupada = _diarioEntradaJaUsada(_diarioEntradaSelecionada);
+  if (_entradaOcupada) { erro('Esta entrada já possui um período neste mês. Edite o período existente.'); return; }
+  // Valida se há saldo disponível na entrada selecionada
+  const _livreEntrada = _diarioLivreEntrada(_diarioEntradaSelecionada, isEdit ? editId : null);
+  if (_livreEntrada < valor - 0.004) {
+    erro('Valor excede o saldo disponível da entrada selecionada (' + brl(Math.max(0, _livreEntrada)) + ' disponível).');
+    return;
+  }
+  if (fimDate < iniDate) { erro('A data final deve ser igual ou maior do que a data inicial.'); return; }
+  if (_diarioDiffDias(iniDate, fimDate) > 31) { erro('O período não pode ultrapassar 31 dias.'); return; }
+
+  const grupos = _diarioGetGrupos();
+  const gruposMesCad = grupos.filter(function(g) {
+    return g.some(function(p) { return p.mesRef === indice && p.anoRef === anoAtual; });
+  });
+  const grupoAtual = gruposMesCad[_diarioPeriodoAtual] || null;
+  // Pega qualquer período do grupo para usar o slotGroup — sem fallback por índice
+  const periodoDoGrupo = grupoAtual ? grupoAtual[0] : null;
+  // Agrupa com o período existente APENAS quando for explicitamente o "segundo slot" do grupo.
+  // Novos períodos independentes (incluindo períodos encerrados cadastrados individualmente)
+  // recebem sempre um slotGroup próprio.
+  const groupId = (_diarioSegundoSlot && periodoDoGrupo)
+    ? (periodoDoGrupo.slotGroup || periodoDoGrupo.id)
+    : (isEdit
+        ? ((periodos.find(function(p){ return String(p.id) === String(editId); }) || {}).slotGroup || editId)
+        : String(Date.now()));
+
+  const novoPeriodo = {
+    id: isEdit ? editId : String(Date.now()),
+    slot: _diarioSlotEditando,
+    slotGroup: groupId,
+    mesRef: indice,
+    anoRef: anoAtual,
+    diaIni: diaIni, mesIni: mesIni, anoIni: anoIni,
+    diaFim: diaFim, mesFim: mesFim, anoFim: anoFim,
+    valor: valor,
+    entrada: _diarioEntradaSelecionada
+  };
+
+  const outros = periodos.filter(function(p){ return String(p.id) !== String(editId); });
+  for (var i = 0; i < outros.length; i++) {
+    if (_diarioPeriodasSeSobrepoe(novoPeriodo, outros[i])) {
+      erro('Este período se sobrepõe a um período já cadastrado.'); return;
+    }
+  }
+
+  if (isEdit && !window._diarioAvisoEditOk && _diarioPeriodoTemSaidas(periodos.find(function(p){ return String(p.id) === String(editId); }) || novoPeriodo)) {
+    window._diarioAvisoEditOk = true;
+    erro('Este período já tem gastos lançados. O saldo será recalculado. Clique em Salvar novamente para confirmar.');
+    return;
+  }
+  window._diarioAvisoEditOk = false;
+
+  if (isEdit) {
+    const idx = periodos.findIndex(function(p){ return String(p.id) === String(editId); });
+    if (idx >= 0) periodos[idx] = novoPeriodo; else periodos.push(novoPeriodo);
+  } else {
+    periodos.push(novoPeriodo);
+  }
+
+  _diarioSalvarPeriodos(periodos);
+  _diarioPeriodoAtual = 0;
+  fecharPopupDiario();
+  renderizarDiario();
+  recalc(false, false); // atualiza badges de saldo livre
+}
+
+let _diarioExcluirPeriodoId = null;
+
+function confirmarExcluirPeriodoDiarioById(periodoId, isEdit) {
+  if (isEdit) { abrirPopupDiarioEditarById(periodoId); return; }
+  const periodo = _diarioCarregarPeriodos().find(function(p){ return p.id === periodoId; });
+  if (!periodo) return;
+  _diarioExcluirPeriodoId = periodo.id;
+  const temSaidas = _diarioPeriodoTemSaidas(periodo);
+  const msgEl = document.getElementById('popup-diario-excluir-msg');
+  if (msgEl) msgEl.textContent = temSaidas ? 'Este período já tem gastos lançados. Todos os registros serão perdidos permanentemente.' : 'O período será excluído permanentemente.';
+  const btnConf = document.getElementById('popup-diario-excluir-confirmar');
+  if (btnConf) btnConf.onclick = _diarioExecutarExcluir;
+  const overlay = document.getElementById('popup-diario-excluir-overlay');
+  const popup   = document.getElementById('popup-diario-excluir');
+  overlay.style.display = 'block'; popup.style.display = 'block';
+  requestAnimationFrame(function() {
+    popup.style.opacity = '1'; popup.style.transform = 'translate(-50%,-50%) scale(1)'; popup.style.pointerEvents = 'all';
+  });
+}
+
+function fecharPopupDiarioExcluir() {
+  const overlay = document.getElementById('popup-diario-excluir-overlay');
+  const popup   = document.getElementById('popup-diario-excluir');
+  popup.style.opacity = '0'; popup.style.transform = 'translate(-50%,-50%) scale(0.94)'; popup.style.pointerEvents = 'none';
+  setTimeout(function() { popup.style.display = 'none'; overlay.style.display = 'none'; }, 200);
+}
+
+function _diarioExecutarExcluir() {
+  const periodoId = _diarioExcluirPeriodoId;
+  if (!periodoId) return;
+  const toRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(_DIARIO_CHAVE_SAIDAS + '_' + periodoId + '_')) toRemove.push(k);
+  }
+  toRemove.forEach(function(k){ localStorage.removeItem(k); });
+  _diarioSalvarPeriodos(_diarioCarregarPeriodos().filter(function(p){ return p.id !== periodoId; }));
+  fecharPopupDiarioExcluir();
+  _diarioPeriodoAtual = 0;
+  renderizarDiario();
+  recalc(false, false); // devolve valor ao badge
 }
 
 function fecharConfig() {
@@ -4015,8 +5455,10 @@ function _verificarAlertaPrevisao(previsaoPct, totalSal) {
       elVal.className = "previsao-card-valor vermelho alerta-config";
       elPct.className = "previsao-card-pct vermelho alerta-config";
     }
-    // Toast sempre que o pai estiver ativo
-    if (!_alertaPrevisaoJaDisparado) {
+    // Toast apenas na página mensal (não exibir no Diário)
+    const _naPaginaMensal = document.getElementById('view-diario') &&
+                            document.getElementById('view-diario').style.display === 'none';
+    if (!_alertaPrevisaoJaDisparado && _naPaginaMensal) {
       _alertaPrevisaoJaDisparado = true;
       exibirToastSaldo(
         `Previsão de saldo abaixo de ${_alertaPrevisaoPct}% da receita.`,
@@ -4223,14 +5665,14 @@ function abrirPopupTour() {
   const overlay = document.getElementById("popup-tour-overlay");
   const popup   = document.getElementById("popup-tour");
   if (!popup) return;
-  // Detecta qual aba está ativa para o botão "Iniciar tour" chamar a função certa
   const isDiario = document.getElementById('view-diario') &&
                    document.getElementById('view-diario').style.display !== 'none';
   const btnIniciar = popup.querySelector('.btn-iniciar-tour');
   if (btnIniciar) {
     btnIniciar.onclick = function() {
       fecharPopupTour();
-      if (isDiario) iniciarTourDiario(); else iniciarTour();
+      if (isDiario) iniciarTourDiario();
+      else iniciarTour();
     };
   }
   overlay.style.display = "block";
@@ -4240,6 +5682,798 @@ function abrirPopupTour() {
     popup.style.transform     = "translate(-50%,-50%) scale(1)";
     popup.style.pointerEvents = "auto";
   }));
+}
+
+// ── TOUR DA PÁGINA DIÁRIO ──────────────────────────────────────────────────
+
+// ── HELPER: monta a tabela fictícia dos passos 4/5 do tour do diário ──
+// Recebe o objeto `passo` (contexto `this` do passo 4) para salvar os originais nele.
+// Retorna imediatamente — não agenda nenhum highlight.
+function _tourDiarioSetupTabelaFicticia(passo) {
+  if (passo._setupFeito) return; // evita double-setup
+
+  const vazioState = document.getElementById('diario-vazio-state');
+  const ativoState = document.getElementById('diario-ativo-state');
+  passo._eraVazio = vazioState && vazioState.style.display !== 'none';
+  if (vazioState) vazioState.style.display = 'none';
+
+  const wrap0 = document.getElementById('diario-wrap-0');
+  passo._wrap0ClassList = wrap0 ? wrap0.className : '';
+  if (wrap0) {
+    wrap0.style.display = 'block';
+    wrap0.classList.add('unico');
+    passo._wrap0Unico = true;
+    passo._wrap0Filter  = wrap0.style.filter;
+    passo._wrap0Opacity = wrap0.style.opacity;
+    wrap0.style.filter  = '';
+    wrap0.style.opacity = '1';
+  }
+
+  const wrap1 = document.getElementById('diario-wrap-1');
+  if (wrap1) { passo._wrap1Display = wrap1.style.display; wrap1.style.display = 'none'; }
+
+  const colunas = document.getElementById('diario-colunas');
+  if (colunas) { passo._colunasJustify = colunas.style.justifyContent; colunas.style.justifyContent = 'center'; }
+
+  const btnEdit0 = wrap0 && wrap0.querySelector('.diario-periodo-btn-edit');
+  const btnDel0  = wrap0 && wrap0.querySelector('.diario-periodo-btn-del');
+  if (btnEdit0) { passo._btnEditDisplay = btnEdit0.style.display; btnEdit0.style.display = 'none'; }
+  if (btnDel0)  { passo._btnDelDisplay  = btnDel0.style.display;  btnDel0.style.display  = 'none'; }
+  passo._btnEdit0 = btnEdit0; passo._btnDel0 = btnDel0;
+
+  const encEl = document.getElementById('diario-encerrado-0');
+  if (encEl) { passo._encDisplay = encEl.style.display; encEl.style.display = 'none'; }
+  passo._encEl = encEl;
+
+  const tbodyImm = document.getElementById('diario-tbody-0');
+  if (tbodyImm) { passo._tbodyOrigImm = tbodyImm.innerHTML; tbodyImm.innerHTML = ''; }
+  const totalDispElImm = document.getElementById('diario-total-disp-0');
+  if (totalDispElImm) { totalDispElImm.textContent = ''; }
+  const totalSaidaElImm = document.getElementById('diario-total-saida-0');
+  if (totalSaidaElImm) { totalSaidaElImm.textContent = ''; }
+
+  const labelEl = document.getElementById('diario-periodo-label-0');
+  if (labelEl) { passo._labelOrig = labelEl.textContent; labelEl.textContent = '15 Mai → 28 Mai 2026'; }
+  const valorEl = document.getElementById('diario-periodo-valor-0');
+  if (valorEl) { passo._valorOrig = valorEl.textContent; valorEl.textContent = 'R$ 200,00'; }
+
+  const btn2add = document.getElementById('diario-add-segundo-btn');
+  if (btn2add) { passo._btn2Display = btn2add.style.display; btn2add.style.display = 'none'; }
+
+  const tbody = document.getElementById('diario-tbody-0');
+  if (passo._tbodyOrigImm !== undefined) passo._tbodyOrig = passo._tbodyOrigImm;
+  if (tbody) {
+    tbody.innerHTML = '';
+    const totalDias = 14;
+    const limiteDiario = 200 / totalDias;
+    const diasSemana = ['Dom','Seg','Ter','Qui','Sex','Sáb','Dom','Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+    const saidas = [12, 0, 18.5, 8, 0, 25, 11, 0, 14, 9.5, 0, 20, 7, 0];
+    let dispAcum = 0;
+    for (let d = 0; d < totalDias; d++) {
+      const dia = 15 + d;
+      const saida = saidas[d] || 0;
+      dispAcum += limiteDiario - saida;
+      const tr = document.createElement('tr');
+      const tdData = document.createElement('td');
+      tdData.textContent = String(dia).padStart(2,'0') + '/05/2026';
+      tr.appendChild(tdData);
+      const tdDia = document.createElement('td');
+      tdDia.textContent = diasSemana[d];
+      tr.appendChild(tdDia);
+      const tdDisp = document.createElement('td');
+      tdDisp.className = 'diario-td-disponivel' + (dispAcum < 0 ? ' negativo' : '');
+      tdDisp.textContent = 'R$ ' + dispAcum.toFixed(2).replace('.',',');
+      if (dispAcum >= 0) {
+        const ratio = Math.min(dispAcum / 200, 1);
+        const lightness = Math.round(72 - ratio * 36);
+        tdDisp.style.color = 'hsl(120,' + Math.round(40 + ratio * 30) + '%,' + lightness + '%)';
+      }
+      tr.appendChild(tdDisp);
+      const tdSaida = document.createElement('td');
+      const cel = document.createElement('div');
+      cel.className = 'diario-saida-cel';
+      const input = document.createElement('input');
+      input.type = 'text'; input.className = 'diario-saida-input';
+      input.placeholder = 'R$ 0,00'; input.readOnly = true;
+      if (saida > 0) input.value = 'R$ ' + saida.toFixed(2).replace('.',',');
+      cel.appendChild(input);
+      tdSaida.appendChild(cel);
+      tr.appendChild(tdSaida);
+      tbody.appendChild(tr);
+    }
+  }
+
+  const totalDispEl = document.getElementById('diario-total-disp-0');
+  if (totalDispEl) { passo._totalDispOrig = totalDispEl.textContent; passo._totalDispColor = totalDispEl.style.color; totalDispEl.textContent = 'R$ 14,29'; totalDispEl.style.color = '#6effa0'; }
+  const totalSaidaEl = document.getElementById('diario-total-saida-0');
+  if (totalSaidaEl) { passo._totalSaidaOrig = totalSaidaEl.textContent; totalSaidaEl.textContent = 'R$ 125,00'; }
+
+  if (ativoState) ativoState.style.display = 'block';
+  passo._setupFeito = true;
+}
+
+const _tourPassosDiario = [
+
+  // ── 0. INTRODUÇÃO DIÁRIO ──
+  {
+    titulo: 'Página Diário',
+    desc: 'Depois de registrar os gastos fixos do mês, você pode criar períodos para controlar quanto deseja gastar em determinadas datas — muito útil para acompanhar os gastos entre o salário 1 e o salário 2.\n\nSe você usa apenas cartão de crédito, cadastre um único período da abertura até o fechamento da fatura. Assim fica fácil evitar ultrapassar o limite.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const svg = document.getElementById('tour-overlay');
+      svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      _esconderBalao();
+      _tourTimeout(function() {
+        const balao = document.getElementById('tour-balao');
+        if (balao) {
+          const z = _getCssZoom();
+          balao.style.left = (window.innerWidth  / z / 2 - balao.offsetWidth  / 2) + 'px';
+          balao.style.top  = (window.innerHeight / z / 2 - balao.offsetHeight / 2) + 'px';
+        }
+        _mostrarBalao();
+      }, 160);
+    },
+    onSair: function() { _clearTourTimers(); }
+  },
+
+  // ── 1. INTRODUÇÃO + BOTÃO CADASTRAR ──
+  {
+    titulo: 'Cadastre o primeiro período',
+    desc: 'Depois de registrar os gastos fixos do mês, aqui você pode criar um período de datas para gastar um valor específico. Geralmente usamos essa página para anotar um valor que queremos gastar entre os dias que recebemos o salário 1 e o salário 2. Assim, você consegue acompanhar em tempo real se está conseguindo passar o mês conforme planejou.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const svg  = document.getElementById('tour-overlay');
+      const mask = svg.querySelector('#tour-mask');
+      const ns   = 'http://www.w3.org/2000/svg';
+
+      // Garante estado vazio visível (ativoState já foi escondido por _exibirPassoTourDiario)
+      // _eraAtivo = true se havia listagem real antes do tour (ativoState foi escondido)
+      const vazioState = document.getElementById('diario-vazio-state');
+      const ativoState = document.getElementById('diario-ativo-state');
+      this._eraAtivo = ativoState && ativoState.style.display === 'none';
+      this._vazioState = vazioState;
+      this._ativoState = ativoState;
+      if (vazioState) vazioState.style.display = 'flex';
+
+      _tourTimeout(function() {
+        const btn = document.querySelector('.diario-vazio-btn');
+        if (!btn) { _mostrarBalao(); return; }
+        const z = _getCssZoom();
+        const r = btn.getBoundingClientRect();
+        const pad = 12;
+        const x = r.left / z - pad, y = r.top / z - pad;
+        const w = r.width / z + pad * 2, h = r.height / z + pad * 2;
+
+        svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+
+        const hole = document.createElementNS(ns, 'rect');
+        hole.setAttribute('x', x); hole.setAttribute('y', y);
+        hole.setAttribute('width', w); hole.setAttribute('height', h);
+        hole.setAttribute('rx', 8); hole.setAttribute('fill', 'black');
+        hole.classList.add('tour-dyn');
+        mask.appendChild(hole);
+
+        const border = document.createElementNS(ns, 'rect');
+        border.setAttribute('x', x); border.setAttribute('y', y);
+        border.setAttribute('width', w); border.setAttribute('height', h);
+        border.setAttribute('rx', 8); border.setAttribute('fill', 'none');
+        border.setAttribute('stroke', 'rgba(58,110,220,0.85)');
+        border.setAttribute('stroke-width', '2.5');
+        border.classList.add('tour-dyn');
+        svg.appendChild(border);
+
+        btn.style.transition = 'transform 0.35s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.35s';
+        btn.style.transform  = 'scale(1.1)';
+        btn.style.boxShadow  = '0 0 0 6px rgba(58,110,220,0.18)';
+        _tourTimeout(function() {
+          btn.style.transform = 'scale(1)';
+          btn.style.boxShadow = '';
+        }, 420);
+
+        _posicionarBalao([btn]);
+      }, 320);
+    },
+    onSair: function() {
+      _clearTourTimers();
+      const btn = document.querySelector('.diario-vazio-btn');
+      if (btn) { btn.style.transition = ''; btn.style.transform = ''; btn.style.boxShadow = ''; }
+      // Restaura ativoState apenas quando pular o tour (destino -1) ou sair do range 0-3
+      // Se destino ainda está em 0-3, _exibirPassoTourDiario gerencia o ativoState
+      const _passosComBloqueio = [0, 1, 2, 3, 4, 5, 6];
+      if (!_passosComBloqueio.includes(_tourDiarioDestino) && this._eraAtivo) {
+        if (this._vazioState) this._vazioState.style.display = 'none';
+        if (this._ativoState) this._ativoState.style.display = 'block';
+      }
+    }
+  },
+
+  // ── 2. POPUP ABERTO — PERÍODO ──
+  {
+    titulo: 'Defina o intervalo de datas',
+    desc: 'Preencha o período: a data de início é normalmente o dia em que você recebe o salário 1, e a data de fim é o dia anterior ao recebimento do salário 2. Por exemplo, do dia 5 ao dia 19.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const self = this;
+      const svg  = document.getElementById('tour-overlay');
+      const mask = svg.querySelector('#tour-mask');
+      const ns   = 'http://www.w3.org/2000/svg';
+      svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      _esconderBalao();
+      // Esconde a tabela real para não aparecer atrás do popup durante o tour
+      const _ativoStateP1 = document.getElementById('diario-ativo-state');
+      if (_ativoStateP1 && _ativoStateP1.style.display !== 'none') {
+        this._ativoStateDisplay = _ativoStateP1.style.display;
+        _ativoStateP1.style.display = 'none';
+        this._ativoStateEl = _ativoStateP1;
+      }
+      _abrirPopupDiarioTour();
+      const popup        = document.getElementById('popup-diario');
+      const popupOverlay = document.getElementById('popup-diario-overlay');
+      const btnFechar    = popup && popup.querySelector('button[onclick="fecharPopupDiario()"]');
+      if (popupOverlay) popupOverlay.style.display = 'none';
+      if (btnFechar)    { btnFechar.style.display = 'none'; self._btnFechar = btnFechar; }
+      self._popup = popup;
+      _tourTimeout(function() {
+        const alvo = document.getElementById('popup-diario-dia-ini-wrap') &&
+                     document.getElementById('popup-diario-dia-ini-wrap').closest('.popup-meta-group');
+        if (!alvo) { _mostrarBalao(); return; }
+        svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+        const z = _getCssZoom(), r = alvo.getBoundingClientRect(), pad = 8;
+        const x = r.left/z-pad, y = r.top/z-pad, w = r.width/z+pad*2, h = r.height/z+pad*2;
+        const hole = document.createElementNS(ns,'rect');
+        hole.setAttribute('x',x); hole.setAttribute('y',y); hole.setAttribute('width',w); hole.setAttribute('height',h); hole.setAttribute('rx',8); hole.setAttribute('fill','black'); hole.classList.add('tour-dyn'); mask.appendChild(hole);
+        const border = document.createElementNS(ns,'rect');
+        border.setAttribute('x',x); border.setAttribute('y',y); border.setAttribute('width',w); border.setAttribute('height',h); border.setAttribute('rx',8); border.setAttribute('fill','none'); border.setAttribute('stroke','rgba(58,110,220,0.85)'); border.setAttribute('stroke-width','2.5'); border.classList.add('tour-dyn'); svg.appendChild(border);
+        _posicionarBalao([alvo]);
+      }, 400);
+    },
+    onSair: function() {
+      _clearTourTimers();
+      const svg = document.getElementById('tour-overlay');
+      if (svg) svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      if (this._btnFechar) this._btnFechar.style.display = '';
+      // Não restaura ativoState aqui — passo 2 continua com ele escondido
+    }
+  },
+
+  // ── 3. POPUP — ENTRADA VINCULADA ──
+  {
+    titulo: 'Entrada vinculada',
+    desc: 'Vincule o período à sua Entrada 1 ou Entrada 2. Isso indica de qual salário esse dinheiro vem, ajudando o sistema a calcular corretamente quanto sobrou ou quanto foi além do planejado.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const self = this;
+      const svg  = document.getElementById('tour-overlay');
+      const mask = svg.querySelector('#tour-mask');
+      const ns   = 'http://www.w3.org/2000/svg';
+      svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      _esconderBalao();
+      // Esconde a tabela real para não aparecer atrás do popup
+      const _ativoStateP2 = document.getElementById('diario-ativo-state');
+      if (_ativoStateP2 && _ativoStateP2.style.display !== 'none') {
+        this._ativoStateDisplay = _ativoStateP2.style.display;
+        _ativoStateP2.style.display = 'none';
+        this._ativoStateEl = _ativoStateP2;
+      }
+      // Popup já pode estar aberto do passo anterior — só garante que está visível
+      const _popupJaAberto = document.getElementById('popup-diario') &&
+                              document.getElementById('popup-diario').style.display !== 'none' &&
+                              parseFloat(document.getElementById('popup-diario').style.opacity||'0') > 0.5;
+      if (!_popupJaAberto) _abrirPopupDiarioTour();
+      const popup        = document.getElementById('popup-diario');
+      const popupOverlay = document.getElementById('popup-diario-overlay');
+      const btnFechar    = popup && popup.querySelector('button[onclick="fecharPopupDiario()"]');
+      if (popupOverlay) popupOverlay.style.display = 'none';
+      if (btnFechar)    { btnFechar.style.display = 'none'; self._btnFechar = btnFechar; }
+      self._popup = popup;
+      _tourTimeout(function() {
+        // Destaca só os botões Entrada 1 e 2, ignorando o espaço do info abaixo
+        const btn1 = document.getElementById('popup-diario-entrada-1');
+        const btn2 = document.getElementById('popup-diario-entrada-2');
+        const alvo = btn1 && btn1.closest('.popup-meta-group');
+        if (!alvo || !btn1 || !btn2) { _mostrarBalao(); return; }
+        svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+        const z = _getCssZoom();
+        const r1 = btn1.getBoundingClientRect(), r2 = btn2.getBoundingClientRect();
+        const labelEl = alvo.querySelector('.popup-meta-label');
+        const rLabel = labelEl ? labelEl.getBoundingClientRect() : r1;
+        const pad = 8;
+        // Rect abrange do label até o último botão (excluindo o info de baixo)
+        const top    = Math.min(rLabel.top, r1.top, r2.top)   / z - pad;
+        const bottom = Math.max(r1.bottom, r2.bottom)          / z + pad;
+        const left   = Math.min(rLabel.left, r1.left, r2.left) / z - pad;
+        const right  = Math.max(rLabel.right, r1.right, r2.right) / z + pad;
+        const r = { left: left*z, top: top*z, width: (right-left)*z, height: (bottom-top)*z };
+        if (r.width === 0) { _mostrarBalao(); return; }
+        const x = left, y = top, w = right - left, h = bottom - top;
+        const hole = document.createElementNS(ns,'rect');
+        hole.setAttribute('x',x); hole.setAttribute('y',y); hole.setAttribute('width',w); hole.setAttribute('height',h); hole.setAttribute('rx',8); hole.setAttribute('fill','black'); hole.classList.add('tour-dyn'); mask.appendChild(hole);
+        const border = document.createElementNS(ns,'rect');
+        border.setAttribute('x',x); border.setAttribute('y',y); border.setAttribute('width',w); border.setAttribute('height',h); border.setAttribute('rx',8); border.setAttribute('fill','none'); border.setAttribute('stroke','rgba(58,110,220,0.85)'); border.setAttribute('stroke-width','2.5'); border.classList.add('tour-dyn'); svg.appendChild(border);
+        _posicionarBalao([btn1, btn2]);
+      }, 400);
+    },
+    onSair: function() {
+      _clearTourTimers();
+      const svg = document.getElementById('tour-overlay');
+      if (svg) svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      if (this._btnFechar) this._btnFechar.style.display = '';
+      // Não restaura ativoState aqui — passo 3 continua com ele escondido
+    }
+  },
+
+  // ── 4. POPUP — VALOR UTILIZADO ──
+  {
+    titulo: 'Valor utilizado',
+    desc: 'Informe quanto você quer ter disponível para gastar nesse período. O sistema vai dividir esse valor pelos dias do intervalo, mostrando quanto você pode usar por dia. O que sobrar em um dia acumula para o próximo.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const self = this;
+      const svg  = document.getElementById('tour-overlay');
+      const mask = svg.querySelector('#tour-mask');
+      const ns   = 'http://www.w3.org/2000/svg';
+      svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      _esconderBalao();
+      // Esconde a tabela real para não aparecer atrás do popup
+      const _ativoStateP3 = document.getElementById('diario-ativo-state');
+      if (_ativoStateP3 && _ativoStateP3.style.display !== 'none') {
+        this._ativoStateDisplay = _ativoStateP3.style.display;
+        _ativoStateP3.style.display = 'none';
+        this._ativoStateEl = _ativoStateP3;
+      }
+      // Popup já pode estar aberto do passo anterior — só garante que está visível
+      const _popupJaAberto2 = document.getElementById('popup-diario') &&
+                               document.getElementById('popup-diario').style.display !== 'none' &&
+                               parseFloat(document.getElementById('popup-diario').style.opacity||'0') > 0.5;
+      if (!_popupJaAberto2) _abrirPopupDiarioTour();
+      const popup        = document.getElementById('popup-diario');
+      const popupOverlay = document.getElementById('popup-diario-overlay');
+      const btnFechar    = popup && popup.querySelector('button[onclick="fecharPopupDiario()"]');
+      if (popupOverlay) popupOverlay.style.display = 'none';
+      if (btnFechar)    { btnFechar.style.display = 'none'; self._btnFechar = btnFechar; }
+      self._popup = popup;
+      _tourTimeout(function() {
+        const alvo = document.getElementById('popup-diario-valor') &&
+                     document.getElementById('popup-diario-valor').closest('.popup-meta-group');
+        if (!alvo) { _mostrarBalao(); return; }
+        svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+        const z = _getCssZoom(), r = alvo.getBoundingClientRect(), pad = 8;
+        if (r.width === 0) { _mostrarBalao(); return; }
+        const x = r.left/z-pad, y = r.top/z-pad, w = r.width/z+pad*2, h = r.height/z+pad*2;
+        const hole = document.createElementNS(ns,'rect');
+        hole.setAttribute('x',x); hole.setAttribute('y',y); hole.setAttribute('width',w); hole.setAttribute('height',h); hole.setAttribute('rx',8); hole.setAttribute('fill','black'); hole.classList.add('tour-dyn'); mask.appendChild(hole);
+        const border = document.createElementNS(ns,'rect');
+        border.setAttribute('x',x); border.setAttribute('y',y); border.setAttribute('width',w); border.setAttribute('height',h); border.setAttribute('rx',8); border.setAttribute('fill','none'); border.setAttribute('stroke','rgba(58,110,220,0.85)'); border.setAttribute('stroke-width','2.5'); border.classList.add('tour-dyn'); svg.appendChild(border);
+        _posicionarBalao([alvo]);
+      }, 400);
+    },
+    onSair: function() {
+      _clearTourTimers();
+      const svg = document.getElementById('tour-overlay');
+      if (svg) svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      if (this._btnFechar) this._btnFechar.style.display = '';
+      // Não restaura ativoStateEl aqui — _exibirPassoTourDiario gerencia isso de forma centralizada
+      this._ativoStateEl = null;
+    }
+  },
+
+  // ── 5. TABELA — COLUNA DISPONÍVEL ──
+  {
+    titulo: 'Coluna Disponível',
+    desc: 'A coluna "Disponível" mostra quanto você ainda pode gastar no dia. Ela acumula automaticamente o saldo que sobrou dos dias anteriores — se você gastou menos do que o limite, o restante fica disponível para o dia seguinte.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const self = this;
+      const svg  = document.getElementById('tour-overlay');
+      const mask = svg.querySelector('#tour-mask');
+      const ns   = 'http://www.w3.org/2000/svg';
+      // Nota: _esconderBalao e limpar tour-dyn já foram feitos por _exibirPassoTourDiario
+
+      // Monta tabela fictícia (salva originais em `this` para restaurar no onSair do passo 5)
+      _tourDiarioSetupTabelaFicticia(this);
+
+      // Ao retornar do passo 5 (setupFeito já era true), o setup não reaplicou os estilos
+      // do tour — garante explicitamente que estão corretos antes do highlight
+      const wrap0chk = document.getElementById('diario-wrap-0');
+      if (wrap0chk) {
+        if (!wrap0chk.classList.contains('unico')) wrap0chk.classList.add('unico');
+        wrap0chk.style.filter  = '';
+        wrap0chk.style.opacity = '1';
+      }
+      const colunasChk = document.getElementById('diario-colunas');
+      if (colunasChk && colunasChk.style.justifyContent !== 'center') {
+        colunasChk.style.justifyContent = 'center';
+      }
+      const btnEdit0chk = wrap0chk && wrap0chk.querySelector('.diario-periodo-btn-edit');
+      const btnDel0chk  = wrap0chk && wrap0chk.querySelector('.diario-periodo-btn-del');
+      if (btnEdit0chk) btnEdit0chk.style.display = 'none';
+      if (btnDel0chk)  btnDel0chk.style.display  = 'none';
+      const encEl0chk = document.getElementById('diario-encerrado-0');
+      if (encEl0chk) encEl0chk.style.display = 'none';
+
+      _tourTimeout(function() {
+        const table = document.querySelector('#diario-wrap-0 .diario-table');
+        if (!table) { _mostrarBalao(); return; }
+        const ths = table.querySelectorAll('thead th');
+        const thDisp = ths[2]; // "Disponível"
+        if (!thDisp) { _mostrarBalao(); return; }
+
+        svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+        const z = _getCssZoom();
+
+        // Destaca apenas a coluna Disponível
+        const tdsDisp = table.querySelectorAll('tbody td:nth-child(3), tfoot td:nth-child(3)');
+        const allDisp = [thDisp, ...tdsDisp];
+        const rects = allDisp.map(e => e.getBoundingClientRect()).filter(r => r.width > 0);
+        if (rects.length) {
+          const pad = 4;
+          const x = Math.min(...rects.map(r => r.left)) / z - pad;
+          const y = Math.min(...rects.map(r => r.top))  / z - pad;
+          const w = Math.max(...rects.map(r => r.right))  / z + pad - x;
+          const h = Math.max(...rects.map(r => r.bottom)) / z + pad - y;
+          const hole = document.createElementNS(ns,'rect');
+          hole.setAttribute('x',x); hole.setAttribute('y',y); hole.setAttribute('width',w); hole.setAttribute('height',h); hole.setAttribute('rx',4); hole.setAttribute('fill','black'); hole.classList.add('tour-dyn'); mask.appendChild(hole);
+          const border = document.createElementNS(ns,'rect');
+          border.setAttribute('x',x); border.setAttribute('y',y); border.setAttribute('width',w); border.setAttribute('height',h); border.setAttribute('rx',4); border.setAttribute('fill','none'); border.setAttribute('stroke','rgba(58,110,220,0.85)'); border.setAttribute('stroke-width','2'); border.classList.add('tour-dyn'); svg.appendChild(border);
+        }
+
+        _posicionarBalaoEsquerdaDaColuna(allDisp.filter(e => e.getBoundingClientRect().width > 0));
+      }, 300);
+    },
+    onSair: function() {
+      _clearTourTimers();
+      const svg = document.getElementById('tour-overlay');
+      if (svg) svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+      // Tabela fictícia permanece — passo 5 (Saída) a reutiliza
+      // Cleanup completo fica no onSair do passo 5
+      // Reseta flag apenas quando NÃO vai para o passo 5 (que reutiliza o setup)
+      if (_tourDiarioDestino !== 6) this._setupFeito = false;
+    }
+  },
+
+  // ── 6. TABELA — COLUNA SAÍDA ──
+  {
+    titulo: 'Coluna Saída',
+    desc: 'A coluna "Saída" é onde você anota o quanto gastou no dia. Toque no campo e informe o valor — o sistema recalcula o saldo disponível em tempo real, atualizando todos os dias seguintes automaticamente.',
+    _semHighlightInicial: true,
+    onEntrar: function() {
+      const svg  = document.getElementById('tour-overlay');
+      const mask = svg.querySelector('#tour-mask');
+      const ns   = 'http://www.w3.org/2000/svg';
+
+      // Garante que a tabela fictícia está montada (passo 5 pode não ter rodado
+      // se o usuário navegou direto para este passo pelo índice)
+      const p4 = _tourPassosDiario[5];
+      if (p4) _tourDiarioSetupTabelaFicticia(p4);
+
+      // Garante que ativoState está visível
+      const ativoState = document.getElementById('diario-ativo-state');
+      if (ativoState) ativoState.style.display = 'block';
+
+      _tourTimeout(function() {
+        const table = document.querySelector('#diario-wrap-0 .diario-table');
+        if (!table) { _mostrarBalao(); return; }
+        const ths = table.querySelectorAll('thead th');
+        const thSaida = ths[3]; // "Saída"
+        if (!thSaida) { _mostrarBalao(); return; }
+
+        svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+        const z = _getCssZoom();
+
+        // Destaca apenas a coluna Saída
+        const tdsSaida = table.querySelectorAll('tbody td:nth-child(4), tfoot td:nth-child(4)');
+        const allSaida = [thSaida, ...tdsSaida];
+        const rects = allSaida.map(e => e.getBoundingClientRect()).filter(r => r.width > 0);
+        if (rects.length) {
+          const pad = 4;
+          const x = Math.min(...rects.map(r => r.left)) / z - pad;
+          const y = Math.min(...rects.map(r => r.top))  / z - pad;
+          const w = Math.max(...rects.map(r => r.right))  / z + pad - x;
+          const h = Math.max(...rects.map(r => r.bottom)) / z + pad - y;
+          const hole = document.createElementNS(ns,'rect');
+          hole.setAttribute('x',x); hole.setAttribute('y',y); hole.setAttribute('width',w); hole.setAttribute('height',h); hole.setAttribute('rx',4); hole.setAttribute('fill','black'); hole.classList.add('tour-dyn'); mask.appendChild(hole);
+          const border = document.createElementNS(ns,'rect');
+          border.setAttribute('x',x); border.setAttribute('y',y); border.setAttribute('width',w); border.setAttribute('height',h); border.setAttribute('rx',4); border.setAttribute('fill','none'); border.setAttribute('stroke','rgba(58,110,220,0.85)'); border.setAttribute('stroke-width','2'); border.classList.add('tour-dyn'); svg.appendChild(border);
+        }
+
+        _posicionarBalao(allSaida.filter(e => e.getBoundingClientRect().width > 0));
+      }, 300);
+    },
+    onSair: function() {
+      _clearTourTimers();
+      const svg = document.getElementById('tour-overlay');
+      if (svg) svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+
+      // Restaura botões de editar/excluir e banner encerrado (salvos pelo passo 4)
+      // apenas quando NÃO volta para o passo 4, que mantém esses elementos ocultos
+      const p4 = _tourPassosDiario[5];
+      if (_tourDiarioDestino !== 5) {
+        if (p4 && p4._btnEdit0) p4._btnEdit0.style.display = p4._btnEditDisplay || '';
+        if (p4 && p4._btnDel0)  p4._btnDel0.style.display  = p4._btnDelDisplay  || '';
+        if (p4 && p4._encEl)    p4._encEl.style.display     = p4._encDisplay     || '';
+      }
+      // Limpa flag de setup apenas quando NÃO volta para o passo 5 (que reutiliza o DOM montado)
+      if (p4 && _tourDiarioDestino !== 5) p4._setupFeito = false;
+
+      // Remove classe unico, restaura filter/opacity e justifyContent
+      // apenas quando NÃO volta para o passo 5 — que precisa manter esses estilos ativos.
+      const wrap0r = document.getElementById('diario-wrap-0');
+      const colunas = document.getElementById('diario-colunas');
+      if (_tourDiarioDestino !== 5) {
+        if (wrap0r) {
+          wrap0r.classList.remove('unico');
+          if (p4 && p4._wrap0Filter  !== undefined) wrap0r.style.filter  = p4._wrap0Filter;
+          if (p4 && p4._wrap0Opacity !== undefined) wrap0r.style.opacity = p4._wrap0Opacity;
+        }
+        if (colunas) colunas.style.justifyContent = '';
+      }
+
+      // Só reconstrói o diário se o destino NÃO for um dos passos que bloqueiam ativoState (0-5).
+      const _passosComAtivoBloqueado = [0, 1, 2, 3, 4, 5];
+      if (_passosComAtivoBloqueado.includes(_tourDiarioDestino)) {
+        return;
+      }
+
+      // Deixa renderizarDiario reconstruir tudo do zero — estado real do sistema
+      const _eraVazio = p4 && p4._eraVazio;
+      if (_eraVazio) {
+        const vazioState = document.getElementById('diario-vazio-state');
+        const ativoState = document.getElementById('diario-ativo-state');
+        if (ativoState) ativoState.style.display = 'none';
+        if (vazioState) { vazioState.style.display = 'flex'; return; }
+      }
+      if (typeof renderizarDiario === 'function') renderizarDiario();
+    }
+  },
+
+];
+
+let _tourDiarioAtual = 0;
+
+function iniciarTourDiario() {
+  _tourDiarioAtual = 0;
+  _tirarSnapshot();
+  document.body.classList.add('tour-ativo');
+  document.getElementById('tour-overlay').style.display = 'block';
+  document.getElementById('tour-bloqueador').style.display = 'block';
+
+  // Popula o menu lateral com os passos do diário
+  const lista = document.getElementById('tour-indice-lista');
+  if (lista) {
+    lista.innerHTML = '';
+    _tourPassosDiario.forEach(function(passo, i) {
+      const titulo = passo.titulo || ('Etapa ' + (i + 1));
+      const item = document.createElement('button');
+      item.id = 'tour-indice-item-' + i;
+      item.textContent = (i + 1) + '. ' + titulo;
+      item.className = 'tour-indice-item';
+      item.style.cssText = [
+        'display:block;width:100%;text-align:left;background:none;border:none;',
+        'border-radius:8px;padding:8px 12px;font-size:12px;font-weight:500;',
+        'color:rgba(255,255,255,0.75);cursor:pointer;font-family:inherit;',
+        'transition:background 0.15s,color 0.15s;line-height:1.4;'
+      ].join('');
+      item.onmouseover = function() { this.style.background='rgba(255,255,255,0.1)'; this.style.color='#fff'; };
+      item.onmouseout  = function() {
+        if (parseInt(this.id.split('-').pop()) !== _tourDiarioAtual) {
+          this.style.background='none'; this.style.color='rgba(255,255,255,0.75)';
+        }
+      };
+      item.onclick = function() { _tourDiarioIrPara(i); };
+      lista.appendChild(item);
+    });
+  }
+
+  // Cria botão flutuante
+  var btnExistente = document.getElementById('tour-btn-indice');
+  if (btnExistente) btnExistente.remove();
+  var btn = document.createElement('button');
+  btn.id = 'tour-btn-indice';
+  btn.innerHTML = '☰ Etapas do tour';
+  btn.onclick = tourToggleIndice;
+  btn.style.cssText = 'display:none;position:fixed;top:62px;left:18px;z-index:2147483647;background:#3a6edc;border:none;border-radius:12px;padding:12px 20px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;color:#fff;';
+  btn.className = 'tour-btn-indice-float';
+  document.body.appendChild(btn);
+
+  _tourDiarioUltimo = -1;
+  _tourMenuEsconderDiario();
+  _exibirPassoTourDiario(0);
+}
+
+function _tourMenuEsconderDiario() {
+  const btn = document.getElementById('tour-btn-indice');
+  if (btn) btn.style.display = 'none';
+  tourFecharIndice();
+}
+
+function _tourMenuAtualizarDiario(idx) {
+  const lista = document.getElementById('tour-indice-lista');
+  if (!lista) return;
+  lista.querySelectorAll('.tour-indice-item').forEach(function(item, i) {
+    const ativo = i === idx;
+    item.style.background = ativo ? 'rgba(58,110,220,0.35)' : 'none';
+    item.style.color      = ativo ? '#fff' : 'rgba(255,255,255,0.75)';
+    item.style.fontWeight = ativo ? '700' : '500';
+  });
+}
+
+function _tourDiarioIrPara(idx) {
+  tourFecharIndice();
+  if (idx === _tourDiarioAtual) return;
+  _tourDiarioDestino = idx; // seta destino ANTES do onSair para que ele possa decidir o que restaurar
+  if (_tourPassosDiario[_tourDiarioAtual] && _tourPassosDiario[_tourDiarioAtual].onSair) _tourPassosDiario[_tourDiarioAtual].onSair();
+  _tourDiarioAtual = idx;
+  _exibirPassoTourDiario(_tourDiarioAtual);
+}
+
+function tourDiarioProximo() {
+  if (_tourDiarioAtual < _tourPassosDiario.length - 1) {
+    const btn = document.getElementById('tour-btn-indice');
+    if (btn) btn.style.display = 'block';
+    _tourDiarioAtual++;
+    _exibirPassoTourDiario(_tourDiarioAtual);
+  } else {
+    tourPularDiario();
+  }
+}
+
+function tourDiarioAnterior() {
+  if (_tourDiarioAtual > 0) {
+    _tourDiarioAtual--;
+    _exibirPassoTourDiario(_tourDiarioAtual);
+  }
+}
+
+function tourPularDiario() {
+  _clearTourTimers();
+  _tourRemoverSimulacao();
+  fecharPopupDiario();
+  // Sinaliza destino -1 para que onSair saiba que o tour está sendo encerrado
+  _tourDiarioDestino = -1;
+  if (_tourPassosDiario[_tourDiarioAtual] && _tourPassosDiario[_tourDiarioAtual].onSair) _tourPassosDiario[_tourDiarioAtual].onSair();
+  const svg = document.getElementById('tour-overlay');
+  svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+  svg.style.display = 'none';
+  document.getElementById('tour-bloqueador').style.display = 'none';
+  _esconderBalao();
+  tourFecharIndice();
+  const btnIndice = document.getElementById('tour-btn-indice');
+  if (btnIndice) btnIndice.remove();
+  document.body.classList.remove('tour-ativo');
+  _restaurarSnapshot();
+  // Reconstrói o diário do zero para desfazer qualquer DOM fictício injetado
+  // pelo passo 4 (tbody, totais, label, classes), independente de qual passo estava ativo
+  if (typeof renderizarDiario === 'function') renderizarDiario();
+}
+
+function _exibirPassoTourDiario(i) {
+  // 1. Cancela timers pendentes
+  _clearTourTimers();
+  _tourRemoverSimulacao();
+
+  const passo = _tourPassosDiario[i];
+  if (!passo) return;
+
+  // 2. Chama onSair do passo anterior (igual ao tour mensal)
+  const passoAnterior = i > 0 ? _tourPassosDiario[i - 1] : (i < _tourPassosDiario.length - 1 ? _tourPassosDiario[i + 1] : null);
+  // Na navegação, o passo que saiu já foi decrementado/incrementado antes de chamar esta função
+  // Precisamos limpar o passo que estava ativo antes — usamos _tourDiarioUltimo
+  const svg  = document.getElementById('tour-overlay');
+  const mask = svg.querySelector('#tour-mask');
+
+  // Limpa SVG ANTES de chamar onSair para evitar flash de highlight
+  svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+
+  // Expõe o destino ANTES de chamar onSair para que ele possa decidir o que restaurar
+  _tourDiarioDestino = i;
+
+  if (typeof _tourDiarioUltimo === 'number' && _tourDiarioUltimo !== i) {
+    const psair = _tourPassosDiario[_tourDiarioUltimo];
+    if (psair && psair.onSair) psair.onSair.call(psair);
+    // Se estava num passo com popup (1,2,3) e vai para fora desse range, fecha o popup
+    const _passoComPopup = [1, 2, 3];
+    if (_passoComPopup.includes(_tourDiarioUltimo) && !_passoComPopup.includes(i)) {
+      // Restaura o infoEl e fecha popup apenas ao sair completamente do range 1-3
+      const infoEl2 = document.getElementById('popup-diario-entrada-info');
+      if (infoEl2) { infoEl2.style.display = ''; infoEl2.style.height = ''; infoEl2.style.margin = ''; }
+      const btnF = document.getElementById('popup-diario') &&
+                   document.getElementById('popup-diario').querySelector('button[onclick="fecharPopupDiario()"]');
+      if (btnF) btnF.style.display = '';
+      // Restaura ativoState que foi escondido durante os passos do popup
+      const ativoStateEl = document.getElementById('diario-ativo-state');
+      if (ativoStateEl) ativoStateEl.style.display = 'block';
+      fecharPopupDiario();
+    }
+  }
+  _tourDiarioUltimo = i;
+
+  // Se o destino é um passo que precisa do ativoState escondido durante a transição,
+  // esconde IMEDIATAMENTE para não vazar durante o timeout de 280ms.
+  // Passo 4 também entra aqui, mas apenas se a tabela fictícia ainda NÃO estiver montada
+  // (ex: vindo do passo 5 de volta, o DOM já está pronto — não esconde para evitar flash).
+  // Passo 5 NÃO está aqui: ele reutiliza a tabela fictícia do passo 4 e mantém ativoState visível.
+  const _passosComAtivoBloqueado = [0, 1, 2, 3, 4, 5];
+  const _p4setupJaFeito = i === 5 && _tourPassosDiario[5] && _tourPassosDiario[5]._setupFeito;
+  if (_passosComAtivoBloqueado.includes(i) && !_p4setupJaFeito) {
+    const ativoStateImm = document.getElementById('diario-ativo-state');
+    if (ativoStateImm && ativoStateImm.style.display !== 'none') {
+      ativoStateImm.style.display = 'none';
+    }
+  }
+
+  _esconderBalao();
+
+  // 280ms: suficiente para fecharPopupDiario (220ms) terminar antes de desenhar highlight
+  _tourTimeout(function() {
+    svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
+
+    document.getElementById('tour-titulo').textContent    = passo.titulo;
+    document.getElementById('tour-desc').textContent      = passo.desc;
+    document.getElementById('tour-progresso').textContent = (i + 1) + ' / ' + _tourPassosDiario.length;
+    _tourMenuAtualizarDiario(i);
+
+    const btnAnt   = document.getElementById('tour-btn-ant');
+    const btnProx  = document.getElementById('tour-btn-prox');
+    const btnPular = document.getElementById('tour-btn-pular');
+    btnAnt.style.display = i === 0 ? 'none' : 'flex';
+    btnProx.textContent  = i === _tourPassosDiario.length - 1 ? '✓ Concluir' : 'Próximo →';
+    btnProx.onclick      = tourDiarioProximo;
+    btnAnt.onclick       = tourDiarioAnterior;
+    if (btnPular) btnPular.onclick = tourPularDiario;
+
+    if (passo.onEntrar) {
+      passo.onEntrar.call(passo);
+    } else {
+      _mostrarBalao();
+    }
+  }, 280);
+}
+
+let _tourDiarioUltimo = -1;
+let _tourDiarioDestino = -1;
+
+
+function _posicionarBalaoAbaixoPopup() {
+  const popup = document.getElementById('popup-diario');
+  const balao = document.getElementById('tour-balao');
+  if (!popup || !balao) return;
+  const z      = _getCssZoom ? _getCssZoom() : 1;
+  const r      = popup.getBoundingClientRect();
+  const balaoW = balao.offsetWidth  || 300;
+  const balaoH = balao.offsetHeight || 220;
+  const vw     = window.innerWidth  / z;
+  const vh     = window.innerHeight / z;
+  const popR   = r.right  / z;
+  const popT   = r.top    / z;
+  const popB   = r.bottom / z;
+  const popL   = r.left   / z;
+
+  // Tenta posicionar à direita do popup
+  if (popR + balaoW + 16 <= vw) {
+    balao.style.left = (popR + 16) + 'px';
+    let top = popT + (r.height / z / 2) - balaoH / 2;
+    if (top < 12) top = 12;
+    if (top + balaoH > vh - 12) top = vh - balaoH - 12;
+    balao.style.top = top + 'px';
+    return;
+  }
+  // Tenta à esquerda
+  if (popL - balaoW - 16 >= 0) {
+    balao.style.left = (popL - balaoW - 16) + 'px';
+    let top = popT + (r.height / z / 2) - balaoH / 2;
+    if (top < 12) top = 12;
+    if (top + balaoH > vh - 12) top = vh - balaoH - 12;
+    balao.style.top = top + 'px';
+    return;
+  }
+  // Fallback: abaixo
+  let left = popL + (r.width / z / 2) - balaoW / 2;
+  if (left < 12) left = 12;
+  if (left + balaoW > vw - 12) left = vw - balaoW - 12;
+  let top = popB + 12;
+  if (top + balaoH > vh - 12) top = popT - balaoH - 12;
+  balao.style.left = left + 'px';
+  balao.style.top  = top  + 'px';
 }
 
 function fecharPopupTour() {
@@ -4349,6 +6583,7 @@ function exportarDados() {
   const prefixos = [
     'planejamento_', // aba 'Mensal' na UI
     'mov_previsao_',
+    'mov_previsao_blocos_',
     'cobrir_valor_',
     'dep_reserva_',
     'dep_meta_',
@@ -4511,42 +6746,165 @@ const bancosListaDiario = ["","Banco do Brasil","Banco PAN","Bradesco","BTG Pact
 
 // 'planejamento' é o id interno da aba chamada 'Mensal' na interface.
 // Usar 'planejamento' aqui é intencional para não quebrar o localStorage.
+let _mudarAbaEmAndamento = false;
+
 function mudarAba(aba) {
-  // Salva imediatamente antes de trocar — evita perder edições pendentes no debounce
+  if (_mudarAbaEmAndamento) return;
+
+  const elMes     = document.getElementById('view-mes-container');
+  const elBanner  = document.getElementById('mes-fechado-banner');
+  const elLayout  = document.getElementById('view-main-layout');
+  const elDiario  = document.getElementById('view-diario');
+  const fabMensal = document.getElementById('fab-mensal');
+  const fabDiario = document.getElementById('fab-diario');
+  const tabP      = document.getElementById('tab-planejamento');
+  const tabD      = document.getElementById('tab-diario');
+
+  const vaiParaDiario = (aba === 'diario');
+  const jaNaDiario = elDiario && elDiario.style.display !== 'none';
+  if (vaiParaDiario && jaNaDiario) return;
+  if (!vaiParaDiario && !jaNaDiario) return;
+
+  _mudarAbaEmAndamento = true;
   clearTimeout(_salvoDebounce);
   salvarMes();
 
-  const elMes          = document.getElementById('view-mes-container');
-  const elBanner       = document.getElementById('mes-fechado-banner');
-  const elLayout       = document.getElementById('view-main-layout');
-  const elDiario       = document.getElementById('view-diario');
-  const fabMensal      = document.getElementById('fab-mensal');
-  const fabDiario      = document.getElementById('fab-diario');
-  const tabP           = document.getElementById('tab-planejamento');
-  const tabD           = document.getElementById('tab-diario');
-
-  if (aba === 'diario') {
-    if (elMes)     elMes.style.display    = 'none';
-    if (elBanner)  elBanner.style.display = 'none';
-    if (elLayout)  elLayout.style.display = 'none';
-    if (fabMensal) fabMensal.style.display = 'none';
-    if (elDiario)  elDiario.style.display = 'block';
-    if (fabDiario) fabDiario.style.display = 'flex';
-    tabP.classList.remove('ativo');
-    tabD.classList.add('ativo');
-    carregarMes(); // recalc() atualiza _previsaoSaldoCache, depois chama renderizarDiario()
+  if (vaiParaDiario) {
+    tabP.classList.remove('ativo'); tabD.classList.add('ativo');
   } else {
-    if (elMes)     elMes.style.display    = 'flex';
-    if (elLayout)  elLayout.style.display = 'flex';
-    if (fabMensal) fabMensal.style.display = 'flex';
-    if (elDiario)  elDiario.style.display = 'none';
-    if (fabDiario) fabDiario.style.display = 'none';
-    if (elBanner)  elBanner.style.display = '';
-    tabP.classList.add('ativo');
-    tabD.classList.remove('ativo');
-    carregarMes(); // recarrega os campos do Mensal que foram limpos ao entrar no Diário
+    tabD.classList.remove('ativo'); tabP.classList.add('ativo');
+  }
+
+  const FADE_MS = 130;
+  const elsAtual   = vaiParaDiario ? [elMes, elLayout, elBanner].filter(Boolean) : [elDiario].filter(Boolean);
+  const elsDestino = vaiParaDiario ? [elDiario].filter(Boolean) : [elMes, elLayout].filter(Boolean);
+
+  // Fase 1: fade out
+  elsAtual.forEach(el => {
+    el.style.transition    = `opacity ${FADE_MS}ms ease`;
+    el.style.opacity       = '0';
+    el.style.pointerEvents = 'none';
+  });
+
+  setTimeout(() => {
+    // Fase 2: esconde atual
+    elsAtual.forEach(el => {
+      el.style.display       = 'none';
+      el.style.opacity       = '';
+      el.style.transition    = '';
+      el.style.pointerEvents = '';
+    });
+
+    if (vaiParaDiario) {
+      if (fabMensal) fabMensal.style.display = 'none';
+      if (fabDiario) fabDiario.style.display = 'flex';
+    } else {
+      if (fabDiario) fabDiario.style.display = 'none';
+      if (fabMensal) fabMensal.style.display = 'flex';
+    }
+
+    // Fase 3: destino invisível + carrega dados
+    elsDestino.forEach(el => {
+      el.style.opacity    = '0';
+      el.style.transition = 'none';
+      el.style.display    = (el === elDiario) ? 'block' : 'flex';
+    });
+    if (!vaiParaDiario && elBanner) elBanner.style.display = '';
+
+    if (vaiParaDiario) _atualizarDiarioTituloMes();
+    carregarMes();
+
+    // Fase 4: fade in
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        elsDestino.forEach(el => {
+          el.style.transition = `opacity ${FADE_MS}ms ease`;
+          el.style.opacity    = '1';
+        });
+        setTimeout(() => {
+          elsDestino.forEach(el => {
+            el.style.transition = '';
+            el.style.opacity    = '';
+          });
+          _mudarAbaEmAndamento = false;
+        }, FADE_MS);
+      });
+    });
+
+  }, FADE_MS);
+}
+
+function trocarAba(aba) { mudarAba(aba); }
+
+/* ── DROPDOWN DE MÊS NO DIÁRIO ── */
+(function() {
+  const lista = document.getElementById('diario-mes-dropdown-list');
+  if (!lista) return;
+  meses.forEach((nome, i) => {
+    const item = document.createElement('div');
+    item.className = 'diario-mes-dropdown-item' + (i === indice ? ' ativo' : '');
+    item.textContent = nome;
+    item.addEventListener('click', () => {
+      if (i === indice) { fecharDiarioMesDropdown(); return; }
+      clearTimeout(_changeMonthPendente);
+      clearTimeout(_salvoDebounce);
+      if (_indiceVisual === null) salvarMes();
+      _indiceVisual = null; _anoVisual = null;
+      indice = i;
+      popupAvisoJaExibido = false;
+      toastAvisoAtivo = false;
+      _toastJaExibidoParaEsteSalario = false;
+      atualizarAvisoIcone(false);
+      fecharDiarioMesDropdown();
+      document.getElementById('titulomes').innerText = meses[i];
+      document.getElementById('ano-label').textContent = anoAtual;
+      atualizarEstiloItensAno();
+      _atualizarDiarioTituloMes();
+      document.querySelectorAll('.val-input').forEach(inp => inp.value = '');
+      document.querySelectorAll('.linha select').forEach(s => s.value = '');
+      document.querySelectorAll('.linha input[type=checkbox]').forEach(c => c.checked = false);
+      document.getElementById('sal1').value = '';
+      document.getElementById('sal2').value = '';
+      document.querySelectorAll('.linha').forEach(l => { l._subcategoria = ''; });
+      carregarMes();
+    });
+    lista.appendChild(item);
+  });
+})();
+
+function _atualizarDiarioTituloMes() {
+  const el = document.getElementById('diario-titulomes');
+  if (el) el.textContent = meses[indice];
+  const lista = document.getElementById('diario-mes-dropdown-list');
+  if (lista) {
+    lista.querySelectorAll('.diario-mes-dropdown-item').forEach((item, i) => {
+      item.classList.toggle('ativo', i === indice);
+    });
   }
 }
+
+function toggleDiarioMesDropdown() {
+  const lista = document.getElementById('diario-mes-dropdown-list');
+  const wrap  = document.getElementById('diario-mes-dropdown-wrap');
+  if (!lista || !wrap) return;
+  const aberto = lista.classList.toggle('open');
+  wrap.classList.toggle('aberto', aberto);
+  lista.querySelectorAll('.diario-mes-dropdown-item').forEach((el, i) => {
+    el.classList.toggle('ativo', i === indice);
+  });
+}
+
+function fecharDiarioMesDropdown() {
+  const lista = document.getElementById('diario-mes-dropdown-list');
+  const wrap  = document.getElementById('diario-mes-dropdown-wrap');
+  if (lista) lista.classList.remove('open');
+  if (wrap)  wrap.classList.remove('aberto');
+}
+
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('diario-mes-dropdown-wrap');
+  if (wrap && !wrap.contains(e.target)) fecharDiarioMesDropdown();
+});
 
 function getDiasNoMes(ano, mes) {
   return new Date(ano, mes + 1, 0).getDate();
@@ -4558,163 +6916,6 @@ function formatarDataDiario(ano, mes, dia) {
   return `${d}/${m}/${ano}`;
 }
 
-function chaveDiario(ano, mes, dia) {
-  return `diario_${ano}_${mes}_${dia}`;
-}
-
-function salvarDiario(ano, mes, dia, saida, banco) {
-  const chave = chaveDiario(ano, mes, dia);
-  localStorage.setItem(chave, JSON.stringify({ saida, banco }));
-}
-
-function carregarDiario(ano, mes, dia) {
-  const chave = chaveDiario(ano, mes, dia);
-  const raw = localStorage.getItem(chave);
-  return raw ? JSON.parse(raw) : { saida: '', banco: '' };
-}
-
-function renderizarDiario() {
-  // Usa o cache atualizado por recalc() — nunca lê DOM que pode estar oculto
-  const previsaoSaldo = _previsaoSaldoCache;
-
-  // Limite mensal: se toggle desativado e valor salvo > 0, usa o personalizado; senão usa previsão
-  const cfgLimite = getLimiteMensalDiario();
-  const limiteMensal = !cfgLimite.ativo && cfgLimite.valor > 0
-    ? cfgLimite.valor
-    : (previsaoSaldo > 0 ? previsaoSaldo : 0);
-
-  const dias = getDiasNoMes(anoAtual, indice);
-  const limiteDiario = dias > 0 ? limiteMensal / dias : 0;
-
-  // Atualiza título com mês e ano
-  const elMesTitulo = document.getElementById('diario-mes-titulo');
-  if (elMesTitulo) elMesTitulo.textContent = `— ${meses[indice]} ${anoAtual}`;
-
-  // Dia atual
-  const hoje = new Date();
-  const diaHoje = (hoje.getFullYear() === anoAtual && hoje.getMonth() === indice) ? hoje.getDate() : -1;
-
-  const tbodyEsq = document.getElementById('diario-tbody-esq');
-  const tbodyDir = document.getElementById('diario-tbody-dir');
-  tbodyEsq.innerHTML = '';
-  tbodyDir.innerHTML = '';
-
-  const metade = Math.ceil(dias / 2);
-
-  let dispAcum = 0;
-  let totalSaidaEsq = 0;
-  let totalSaidaDir = 0;
-  let dispFinalEsq = 0;
-  let dispFinalDir = 0;
-
-  // Pré-calcula tudo para disponível acumulado correto
-  const linhas = [];
-  for (let d = 1; d <= dias; d++) {
-    const dado = carregarDiario(anoAtual, indice, d);
-    const saidaVal = dado.saida ? num(dado.saida) : 0;
-    dispAcum += limiteDiario - saidaVal;
-    linhas.push({ d, dado, saidaVal, dispAcum });
-  }
-
-  document.getElementById('diario-limite-mensal').value = brl(limiteMensal);
-  document.getElementById('diario-limite-diario').textContent = brl(limiteDiario);
-
-  // Garante visibilidade do lápis conforme estado do toggle
-  _sincronizarToggleLimiteDiario();
-
-  const diarioBloqueado = mesFechado(anoAtual, indice);
-  const banner = document.getElementById('diario-banner-fechado');
-  if (banner) { banner.classList.toggle('visivel', diarioBloqueado); }
-
-  function criarLinha(item, tbody) {
-    const { d, dado, saidaVal, dispAcum } = item;
-    const tr = document.createElement('tr');
-    if (d === diaHoje) tr.classList.add('diario-hoje');
-    if (diarioBloqueado) tr.classList.add('diario-bloqueado');
-
-    // Data
-    const tdData = document.createElement('td');
-    tdData.textContent = formatarDataDiario(anoAtual, indice, d);
-    tr.appendChild(tdData);
-
-    // Dia da semana
-    const tdDiaSemana = document.createElement('td');
-    const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-    const dataLinha = new Date(anoAtual, indice, d);
-    tdDiaSemana.textContent = diasSemana[dataLinha.getDay()];
-    tr.appendChild(tdDiaSemana);
-
-    // Disponível
-    const tdDisp = document.createElement('td');
-    tdDisp.className = 'diario-td-disponivel' + (dispAcum < 0 ? ' negativo' : '');
-    tdDisp.textContent = brl(dispAcum);
-    tr.appendChild(tdDisp);
-
-    // Saída
-    const tdSaida = document.createElement('td');
-    tdSaida.style.position = 'relative';
-    const inputSaida = document.createElement('input');
-    inputSaida.type = 'text';
-    inputSaida.className = 'diario-saida-input';
-    inputSaida.placeholder = 'R$ 0,00';
-    inputSaida.autocomplete = 'off';
-    if (dado.saida) inputSaida.value = dado.saida;
-    inputSaida.dataset.dia = d;
-    if (diarioBloqueado) {
-      inputSaida.disabled = true;
-      inputSaida.style.cursor = 'not-allowed';
-      inputSaida.style.opacity = '0.6';
-    }
-    inputSaida.addEventListener('input', function() { fmtInput(this); });
-    inputSaida.addEventListener('blur', function() {
-      fmt(this);
-      const dia = parseInt(this.dataset.dia);
-      salvarDiario(anoAtual, indice, dia, this.value, '');
-      renderizarDiario();
-    });
-    inputSaida.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') this.blur();
-    });
-    tdSaida.appendChild(inputSaida);
-
-    // Botão X para limpar saída
-    const btnLimpar = document.createElement('button');
-    btnLimpar.className = 'btn-limpar-linha diario-limpar-saida';
-    btnLimpar.textContent = '×';
-    const tooltipLimpar = document.createElement('span');
-    tooltipLimpar.className = 'limpar-tooltip';
-    tooltipLimpar.textContent = 'Limpar saída';
-    btnLimpar.appendChild(tooltipLimpar);
-    btnLimpar.addEventListener('click', () => {
-      inputSaida.value = '';
-      salvarDiario(anoAtual, indice, d, '', '');
-      renderizarDiario();
-    });
-    if (diarioBloqueado) btnLimpar.style.display = 'none';
-    tdSaida.appendChild(btnLimpar);
-
-    tr.appendChild(tdSaida);
-
-    tbody.appendChild(tr);
-  }
-
-  linhas.forEach((item, i) => {
-    if (i < metade) {
-      criarLinha(item, tbodyEsq);
-      totalSaidaEsq += item.saidaVal;
-      dispFinalEsq = item.dispAcum;
-    } else {
-      criarLinha(item, tbodyDir);
-      totalSaidaDir += item.saidaVal;
-      dispFinalDir = item.dispAcum;
-    }
-  });
-
-  const elDispEsq = document.getElementById('diario-total-disponivel-esq'); if (elDispEsq) elDispEsq.textContent = brl(dispFinalEsq);
-  const elSaidaEsq = document.getElementById('diario-total-saida-esq'); if (elSaidaEsq) elSaidaEsq.textContent = brl(totalSaidaEsq);
-  document.getElementById('diario-total-disponivel-dir').textContent  = brl(dispFinalDir);
-  document.getElementById('diario-total-saida-dir').textContent       = brl(totalSaidaDir);
-}
 /* Fecha qualquer select-banco-list aberto ao clicar fora */
 document.addEventListener('click', () => {
   document.querySelectorAll('.select-banco-list.open').forEach(l => l.classList.remove('open'));
@@ -5865,7 +8066,32 @@ const _tourPassos = [
     }
   },
 
-  // ── 14. PREVISÃO DE SALDO ──
+  // ── 14. SALDO LIVRE POR BLOCO ──
+  {
+    alvos: ['sub1-livre', 'sub2-livre'],
+    separados: true,
+    titulo: 'Saldo livre por bloco',
+    desc: 'Mostra quanto ainda sobra em cada bloco depois de descontar todos os gastos e os valores enviados para a reserva ou metas. Verde significa que ainda há dinheiro disponível; vermelho indica que os compromissos ultrapassaram o salário daquele bloco.',
+    padT: 6, padR: 10, padB: 6, padL: 10,
+    onEntrar: function() {
+      ['sub1-livre', 'sub2-livre'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.transition = 'box-shadow 0.4s ease';
+        el.style.boxShadow  = '0 0 0 3px rgba(58,110,220,0.5)';
+        _tourTimeout(function() { el.style.boxShadow = '0 0 0 0px rgba(58,110,220,0)'; }, 500);
+      });
+    },
+    onSair: function() {
+      _clearTourTimers();
+      ['sub1-livre', 'sub2-livre'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) { el.style.transition = ''; el.style.boxShadow = ''; }
+      });
+    }
+  },
+
+  // ── 15. PREVISÃO DE SALDO ──
   {
     alvo: 'p-previsao',
     titulo: 'Previsão de Saldo',
@@ -5885,7 +8111,7 @@ const _tourPassos = [
     }
   },
 
-  // ── 15. PREVISÃO DE GASTOS ──
+  // ── 16. PREVISÃO DE GASTOS ──
   {
     alvo: 'p-total',
     titulo: 'Previsão de Gastos',
@@ -5905,7 +8131,7 @@ const _tourPassos = [
     }
   },
 
-  // ── 16. RESERVA DE EMERGÊNCIA ──
+  // ── 17. RESERVA DE EMERGÊNCIA ──
   {
     alvo: 'res-saldo-display',
     titulo: 'Reserva de Emergência',
@@ -5977,7 +8203,7 @@ const _tourPassos = [
     }
   },
 
-  // ── 17. SIMULAR RESERVA ──
+  // ── 18. SIMULAR RESERVA ──
   {
     alvo: 'btn-simular-reserva',
     titulo: 'Simulador de Reserva',
@@ -6066,7 +8292,7 @@ const _tourPassos = [
     }
   },
 
-  // ── 18. METAS FINANCEIRAS ──
+  // ── 19. METAS FINANCEIRAS ──
   {
     alvo: 'meta-card-principal',
     titulo: 'Metas financeiras',
@@ -6117,7 +8343,7 @@ const _tourPassos = [
     onSair: function() { _clearTourTimers(); }
   },
 
-  // ── 19. REPLICAR MÊS ──
+  // ── 26. REPLICAR MÊS ──
   {
     alvo: 'view-mes-container',
     titulo: 'Replicar gastos do mês',
@@ -6336,346 +8562,6 @@ const _tourPassos = [
   },
 
 ];
-/* ══════════════════════════════════════════════
-   TOUR DIÁRIO
-   ══════════════════════════════════════════════ */
-
-const _tourPassosDiario = [
-
-  // ── 0. INTRODUÇÃO DIÁRIO ──
-  {
-    alvo: 'diario-info-card',
-    titulo: 'Página Diário',
-    desc: 'Depois de planejar os gastos fixos na página Mensal, é aqui que entram os imprevistos do dia a dia — uber, lanche, gasolina, aquela compra que não estava nos planos. Separe um valor para esses gastos e o sistema divide pelo número de dias do mês, mostrando quanto você pode usar por dia. O que não usar acumula para o dia seguinte, e assim você acompanha em tempo real se está respeitando o que planejou.',
-    _semHighlightInicial: true,
-    onEntrar: function() {
-      const svg = document.getElementById('tour-overlay');
-      svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
-      _esconderBalao();
-      _tourTimeout(function() {
-        const balao = document.getElementById('tour-balao');
-        if (balao) {
-          const z = _getCssZoom();
-          balao.style.left = (window.innerWidth / z / 2 - balao.offsetWidth / 2) + 'px';
-          balao.style.top  = (window.innerHeight / z / 2 - balao.offsetHeight / 2) + 'px';
-        }
-        _mostrarBalao();
-      }, 160);
-    },
-    onSair: function() { _clearTourTimers(); }
-  },
-
-  // ── 1. LIMITES MENSAL E DIÁRIO ──
-  {
-    alvo: 'diario-info-card',
-    titulo: 'Limites de gasto',
-    desc: 'O limite mensal é o valor que aparece no campo “Previsão de Saldo”. O limite diário é esse valor dividido pelos dias do mês. Assim, você sabe quanto pode gastar por dia e consegue ver se vai terminar o mês dentro do planejado ou se vai precisar usar a reserva de emergência.',
-    padT: 12, padR: 16, padB: 12, padL: 16,
-    onEntrar: function() {
-      const el = document.getElementById('diario-info-card');
-      if (!el) return;
-      el.style.transition = 'transform 0.35s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.35s';
-      el.style.transform  = 'scale(1.04)';
-      el.style.boxShadow  = '0 6px 24px rgba(28,63,145,0.18)';
-      _tourTimeout(function() {
-        el.style.transform = 'scale(1)';
-        el.style.boxShadow = '';
-      }, 500);
-    },
-    onSair: function() {
-      _clearTourTimers();
-      const el = document.getElementById('diario-info-card');
-      if (el) { el.style.transition = ''; el.style.transform = ''; el.style.boxShadow = ''; }
-    }
-  },
-
-  // ── 2. COLUNA DISPONÍVEL ──
-  {
-    alvo: 'diario-colunas',
-    titulo: 'Coluna Disponível',
-    desc: 'Mostra quanto você pode gastar no dia. Se não usar tudo, o valor restante passa para o dia seguinte e vai acumulando ao longo do mês. É um saldo diário que se ajusta ao seu ritmo de gastos.',
-    _semHighlightInicial: true,
-    onEntrar: function() {
-      _tourIluminarColunaDiario(2, 0);
-    },
-    onSair: function() { _clearTourTimers(); }
-  },
-
-  // ── 3. COLUNA SAÍDA ──
-  {
-    alvo: 'diario-colunas',
-    titulo: 'Coluna Saída',
-    desc: 'Aqui você registra seus gastos do dia a dia, como mercado, transporte e lazer. Diferente do Mensal, que é para despesas fixas (como aluguel e cartões), a Saída é para os gastos variáveis do cotidiano.',
-    _semHighlightInicial: true,
-    onEntrar: function() {
-      _tourIluminarColunaDiario(3, 0);
-    },
-    onSair: function() { _clearTourTimers(); }
-  },
-];
-
-// Ilumina a coluna inteira (colIdx 0-based) nas duas tabelas do diário.
-// Mede th → última linha do tbody/tfoot para um único retângulo por tabela.
-// Posiciona o balão do lado direito das colunas iluminadas, alinhado ao centro vertical.
-function _tourIluminarColunaDiario(colIdx, delay) {
-  const svg  = document.getElementById('tour-overlay');
-  const mask = svg.querySelector('#tour-mask');
-  const ns   = 'http://www.w3.org/2000/svg';
-  svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
-  // Não esconde o balão aqui — ele permanece visível durante o delay e é reposicionado depois
-
-  function executar() {
-    const z = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
-    svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
-
-    const tables = document.querySelectorAll('.diario-table');
-    const colRects = []; // um rect por tabela representando a coluna inteira
-
-    tables.forEach(function(table) {
-      const th = table.querySelectorAll('thead th')[colIdx];
-      if (!th) return;
-
-      // Linha mais baixa: tfoot td se existir, senão último tbody tr
-      var bottomEl = null;
-      const ftds = table.querySelectorAll('tfoot td');
-      if (ftds.length > colIdx) {
-        bottomEl = ftds[colIdx];
-      } else {
-        const tbodyRows = table.querySelectorAll('tbody tr');
-        if (tbodyRows.length) {
-          const lastRow = tbodyRows[tbodyRows.length - 1];
-          const tds = lastRow.querySelectorAll('td');
-          if (tds.length > colIdx) bottomEl = tds[colIdx];
-        }
-      }
-      if (!bottomEl) bottomEl = th;
-
-      const rTop    = th.getBoundingClientRect();
-      const rBottom = bottomEl.getBoundingClientRect();
-
-      const x = rTop.left    / z - 2;
-      const y = rTop.top     / z - 2;
-      const w = rTop.width   / z + 4;
-      const h = rBottom.bottom / z - rTop.top / z + 4;
-
-      colRects.push({ x, y, w, h });
-
-      // Furo (transparência) — coluna inteira
-      const hole = document.createElementNS(ns, 'rect');
-      hole.setAttribute('x', x); hole.setAttribute('y', y);
-      hole.setAttribute('width', w); hole.setAttribute('height', h);
-      hole.setAttribute('rx', 6); hole.setAttribute('fill', 'black');
-      hole.classList.add('tour-dyn');
-      mask.appendChild(hole);
-
-      // Borda azul ao redor da coluna inteira
-      const border = document.createElementNS(ns, 'rect');
-      border.setAttribute('x', x); border.setAttribute('y', y);
-      border.setAttribute('width', w); border.setAttribute('height', h);
-      border.setAttribute('rx', 6);
-      border.setAttribute('fill', 'none');
-      border.setAttribute('stroke', 'rgba(58,110,220,0.85)');
-      border.setAttribute('stroke-width', '2.5');
-      border.classList.add('tour-dyn');
-      svg.appendChild(border);
-    });
-
-    if (!colRects.length) { _mostrarBalao(); return; }
-
-    // Posiciona o balão à direita das colunas iluminadas, centrado verticalmente
-    _tourPosicionarBalaoColunaDiario(colRects);
-  }
-
-  if (delay > 0) {
-    _tourTimeout(executar, delay);
-  } else {
-    executar();
-  }
-}
-
-// Posiciona o balão à direita das colunas, ou abaixo se não couber
-function _tourPosicionarBalaoColunaDiario(colRects) {
-  const balao = document.getElementById('tour-balao');
-  if (!balao) return;
-  const z   = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
-  const vW  = window.innerWidth  / z;
-  const vH  = window.innerHeight / z;
-  const bW  = 300;
-  const bH  = balao.offsetHeight || 200;
-  const marg = 12;
-
-  const top    = Math.min.apply(null, colRects.map(function(r) { return r.y; }));
-  const bottom = Math.max.apply(null, colRects.map(function(r) { return r.y + r.h; }));
-  const midY   = (top + bottom) / 2;
-
-  var bTop, bLeft;
-
-  if (colRects.length === 2) {
-    // Ordena pelo x para garantir esq/dir
-    const sorted = colRects.slice().sort(function(a, b) { return a.x - b.x; });
-    // Ponto médio exato entre a borda direita da col esquerda e a borda esquerda da col direita
-    const midX = (sorted[0].x + sorted[0].w + sorted[1].x) / 2;
-    bLeft = midX - bW / 2;
-    bTop  = midY - bH / 2;
-  } else {
-    const right = Math.max.apply(null, colRects.map(function(r) { return r.x + r.w; }));
-    const left  = Math.min.apply(null, colRects.map(function(r) { return r.x; }));
-    if (vW - right >= bW + marg) {
-      bLeft = right + marg;
-      bTop  = midY - bH / 2;
-    } else if (left >= bW + marg) {
-      bLeft = left - marg - bW;
-      bTop  = midY - bH / 2;
-    } else if (vH - bottom >= bH + marg) {
-      bTop  = bottom + marg;
-      bLeft = left + (right - left) / 2 - bW / 2;
-    } else {
-      bTop  = top - marg - bH;
-      bLeft = left + (right - left) / 2 - bW / 2;
-    }
-  }
-
-  bLeft = Math.max(16, Math.min(bLeft, vW - bW - 16));
-  bTop  = Math.max(16, Math.min(bTop,  vH - bH - 16));
-
-  balao.style.left = bLeft + 'px';
-  balao.style.top  = bTop  + 'px';
-  _mostrarBalao();
-}
-
-let _tourDiarioAtual = 0;
-
-function iniciarTourDiario() {
-  _tourDiarioAtual = 0;
-  document.body.classList.add('tour-ativo');
-  document.getElementById('tour-overlay').style.display = 'block';
-  _exibirPassoTourDiario(_tourDiarioAtual);
-}
-
-function _exibirPassoTourDiario(i) {
-  _clearTourTimers();
-  _tourRemoverSimulacao();
-
-  const passo = _tourPassosDiario[i];
-  if (i > 0 && _tourPassosDiario[i-1].onSair) _tourPassosDiario[i-1].onSair();
-
-  const ids = passo.alvos || [passo.alvo];
-  const els = ids.map(function(id) { return document.getElementById(id); }).filter(Boolean);
-  if (!els.length) return;
-
-  const svg  = document.getElementById('tour-overlay');
-  const ns   = 'http://www.w3.org/2000/svg';
-  const mask = svg.querySelector('#tour-mask');
-
-  // ── Fase 1: fade-out suave do balão ──
-  const balao = document.getElementById('tour-balao');
-  _esconderBalao();
-
-  // ── Fase 2 (após 160ms = duração do fade-out): troca conteúdo + highlight ──
-  _tourTimeout(function() {
-
-    svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
-
-    // Atualiza conteúdo do balão enquanto está invisível
-    document.getElementById('tour-titulo').textContent    = passo.titulo;
-    document.getElementById('tour-desc').textContent      = passo.desc;
-    document.getElementById('tour-progresso').textContent = (i + 1) + ' / ' + _tourPassosDiario.length;
-
-    const btnAnt  = document.getElementById('tour-btn-ant');
-    const btnProx = document.getElementById('tour-btn-prox');
-    btnAnt.style.display = i === 0 ? 'none' : 'flex';
-    btnProx.textContent  = i === _tourPassosDiario.length - 1 ? '✓ Concluir' : 'Próximo →';
-
-    // Redireciona os botões para o tour do diário
-    btnProx.onclick = tourProximoDiario;
-    btnAnt.onclick  = tourAnteriorDiario;
-    document.getElementById('tour-btn-pular').onclick = tourPularDiario;
-
-    if (!passo._semHighlightInicial) {
-      const rects = els.map(function(el) { return _getRectPadded(el, passo); });
-      const x      = Math.min.apply(null, rects.map(function(r) { return r.x; }));
-      const y      = Math.min.apply(null, rects.map(function(r) { return r.y; }));
-      const right  = Math.max.apply(null, rects.map(function(r) { return r.right; }));
-      const bottom = Math.max.apply(null, rects.map(function(r) { return r.bottom; }));
-      const w = right - x, h = bottom - y;
-      const cx = x + w / 2;
-
-      const hole = document.createElementNS(ns, 'rect');
-      hole.setAttribute('x', x); hole.setAttribute('y', y);
-      hole.setAttribute('width', w); hole.setAttribute('height', h);
-      hole.setAttribute('rx', 10); hole.setAttribute('fill', 'black');
-      hole.classList.add('tour-dyn');
-      mask.appendChild(hole);
-
-      const border = document.createElementNS(ns, 'rect');
-      border.setAttribute('x', x); border.setAttribute('y', y);
-      border.setAttribute('width', w); border.setAttribute('height', h);
-      border.setAttribute('rx', 10); border.setAttribute('fill', 'none');
-      border.setAttribute('stroke', 'rgba(58,110,220,0.85)');
-      border.setAttribute('stroke-width', '2.5');
-      border.classList.add('tour-dyn');
-      svg.appendChild(border);
-
-      const vH = window.innerHeight / _getCssZoom();
-      const bH = balao.offsetHeight || 200;
-      const marg = 14;
-      var bTop, bLeft;
-      if (vH - bottom >= bH + marg) {
-        bTop  = bottom + marg;
-        bLeft = cx - 150;
-      } else if (y >= bH + marg) {
-        bTop  = y - marg - bH;
-        bLeft = cx - 150;
-      } else {
-        bTop  = vH / 2 - bH / 2;
-        bLeft = window.innerWidth / _getCssZoom() / 2 - 150;
-      }
-      bLeft = Math.max(16, Math.min(bLeft, window.innerWidth / _getCssZoom() - 316));
-      bTop  = Math.max(16, Math.min(bTop, vH - bH - 16));
-      balao.style.top  = bTop + 'px';
-      balao.style.left = bLeft + 'px';
-      _mostrarBalao();
-    }
-
-    // Para passos _semHighlightInicial: onEntrar cuida de desenhar highlight e chamar _mostrarBalao
-    if (passo.onEntrar) passo.onEntrar.call(passo);
-
-  }, 160);
-}
-
-function tourProximoDiario() {
-  if (_tourDiarioAtual < _tourPassosDiario.length - 1) {
-    _tourDiarioAtual++;
-    _exibirPassoTourDiario(_tourDiarioAtual);
-  } else {
-    tourPularDiario();
-  }
-}
-
-function tourAnteriorDiario() {
-  if (_tourDiarioAtual > 0) {
-    _tourDiarioAtual--;
-    _exibirPassoTourDiario(_tourDiarioAtual);
-  }
-}
-
-function tourPularDiario() {
-  _clearTourTimers();
-  _tourRemoverSimulacao();
-  if (_tourPassosDiario[_tourDiarioAtual] && _tourPassosDiario[_tourDiarioAtual].onSair) {
-    _tourPassosDiario[_tourDiarioAtual].onSair();
-  }
-  const svg = document.getElementById('tour-overlay');
-  svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
-  svg.style.display = 'none';
-  _esconderBalao();
-  document.body.classList.remove('tour-ativo');
-  // Restaura os botões do tour do planejamento
-  document.getElementById('tour-btn-prox').onclick  = tourProximo;
-  document.getElementById('tour-btn-ant').onclick   = tourAnterior;
-  document.getElementById('tour-btn-pular').onclick = tourPular;
-}
-
 let _tourAtual = 0;
 
 function iniciarTour() {
@@ -6683,6 +8569,115 @@ function iniciarTour() {
   _tirarSnapshot();
   document.body.classList.add('tour-ativo');
   document.getElementById('tour-overlay').style.display = 'block';
+  document.getElementById('tour-bloqueador').style.display = 'block';
+  // Reassigna imediatamente os botões do balão para o tour mensal,
+  // garantindo que não apontem para funções do tour do diário
+  var _btnProxImm  = document.getElementById('tour-btn-prox');
+  var _btnAntImm   = document.getElementById('tour-btn-ant');
+  var _btnPularImm = document.getElementById('tour-btn-pular');
+  if (_btnProxImm)  _btnProxImm.onclick  = tourProximo;
+  if (_btnAntImm)   _btnAntImm.onclick   = tourAnterior;
+  if (_btnPularImm) _btnPularImm.onclick  = tourPular;
+  _tourMenuPopular();
+  // Cria/move botão índice para o final do body garantindo que fique acima de tudo
+  var btnExistente = document.getElementById('tour-btn-indice');
+  if (btnExistente) btnExistente.remove();
+  var btn = document.createElement('button');
+  btn.id = 'tour-btn-indice';
+  btn.innerHTML = '☰ Etapas do tour';
+  btn.onclick = tourToggleIndice;
+  btn.style.cssText = 'display:none;position:fixed;top:62px;left:18px;z-index:2147483647;background:#3a6edc;border:none;border-radius:12px;padding:12px 20px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;color:#fff;';
+  btn.className = 'tour-btn-indice-float';
+  document.body.appendChild(btn);
+  // Menu só aparece após o primeiro "próximo"
+  _tourMenuEsconder();
+  _exibirPassoTour(_tourAtual);
+}
+
+function _tourMenuPopular() {
+  const lista = document.getElementById('tour-indice-lista');
+  if (!lista) return;
+  lista.innerHTML = '';
+  _tourPassos.forEach(function(passo, i) {
+    const titulo = passo.titulo || ('Etapa ' + (i + 1));
+    const item = document.createElement('button');
+    item.id = 'tour-indice-item-' + i;
+    item.textContent = (i + 1) + '. ' + titulo;
+    item.className = 'tour-indice-item';
+    item.style.cssText = [
+      'display:block;width:100%;text-align:left;background:none;border:none;',
+      'border-radius:8px;padding:8px 12px;font-size:12px;font-weight:500;',
+      'color:rgba(255,255,255,0.75);cursor:pointer;font-family:inherit;',
+      'transition:background 0.15s,color 0.15s;line-height:1.4;'
+    ].join('');
+    item.onmouseover = function() { if (!item.classList.contains('ativo')) { item.style.background='rgba(255,255,255,0.1)'; item.style.color='#fff'; } };
+    item.onmouseout  = function() { if (!item.classList.contains('ativo')) { item.style.background='none'; item.style.color='rgba(255,255,255,0.75)'; } };
+    item.onclick = function() { _tourIrPara(i); };
+    lista.appendChild(item);
+  });
+}
+
+function _tourMenuAtualizar(idx) {
+  const lista = document.getElementById('tour-indice-lista');
+  if (!lista) return;
+  lista.querySelectorAll('button').forEach(function(btn, i) {
+    const ativo = i === idx;
+    btn.classList.toggle('ativo', ativo);
+    btn.style.background = ativo ? 'rgba(255,255,255,0.18)' : 'none';
+    btn.style.color      = ativo ? '#fff' : 'rgba(255,255,255,0.75)';
+    btn.style.fontWeight = ativo ? '700' : '500';
+    if (ativo) btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+}
+
+function _tourMenuMostrar() {
+  const btn = document.getElementById('tour-btn-indice');
+  if (btn) { btn.style.display = 'block'; }
+}
+
+function _tourMenuEsconder() {
+  const btn = document.getElementById('tour-btn-indice');
+  if (btn) btn.style.display = 'none';
+  tourFecharIndice();
+}
+
+function tourToggleIndice() {
+  const painel  = document.getElementById('tour-indice-painel');
+  const overlay = document.getElementById('tour-indice-overlay');
+  const btn     = document.getElementById('tour-btn-indice');
+  if (!painel) return;
+  const aberto = painel.style.transform === 'translateX(0%)';
+  if (aberto) {
+    tourFecharIndice();
+  } else {
+    _tourMenuAtualizar(_tourAtual);
+    if (btn) btn.style.display = 'none';
+    overlay.style.display = 'block';
+    painel.style.display  = 'flex';
+    requestAnimationFrame(function() {
+      painel.style.transform = 'translateX(0%)';
+      painel.style.opacity   = '1';
+    });
+  }
+}
+
+function tourFecharIndice() {
+  const painel  = document.getElementById('tour-indice-painel');
+  const overlay = document.getElementById('tour-indice-overlay');
+  const btn     = document.getElementById('tour-btn-indice');
+  if (!painel) return;
+  painel.style.transform = 'translateX(-100%)';
+  painel.style.opacity   = '0';
+  setTimeout(function() { painel.style.display = 'none'; }, 230);
+  if (overlay) overlay.style.display = 'none';
+  if (btn && btn.style.display === 'none' && document.body.classList.contains('tour-ativo')) btn.style.display = 'block';
+}
+
+function _tourIrPara(idx) {
+  tourFecharIndice();
+  if (idx === _tourAtual) return;
+  if (_tourPassos[_tourAtual] && _tourPassos[_tourAtual].onSair) _tourPassos[_tourAtual].onSair();
+  _tourAtual = idx;
   _exibirPassoTour(_tourAtual);
 }
 
@@ -6709,6 +8704,46 @@ function _mostrarBalao() {
 }
 
 // Posiciona o balão relativo a um ou mais elementos (ou elemento central)
+function _posicionarBalaoEsquerdaDaColuna(els) {
+  const balao = document.getElementById('tour-balao');
+  if (!balao) return;
+  const z    = _getCssZoom();
+  const vW   = window.innerWidth  / z;
+  const vH   = window.innerHeight / z;
+  const bW   = 300;
+  const bH   = balao.offsetHeight || 200;
+  const marg = 14;
+
+  if (!Array.isArray(els)) els = [els];
+  const rects  = els.map(el => el.getBoundingClientRect());
+  const ancTop    = Math.min(...rects.map(r => r.top))    / z;
+  const ancBottom = Math.max(...rects.map(r => r.bottom)) / z;
+  const ancLeft   = Math.min(...rects.map(r => r.left))   / z;
+  const ancRight  = Math.max(...rects.map(r => r.right))  / z;
+  const ancCy     = (ancTop + ancBottom) / 2;
+
+  let bTop, bLeft;
+  // Tenta posicionar à esquerda da coluna, centralizado verticalmente
+  if (ancLeft >= bW + marg) {
+    bLeft = ancLeft - bW - marg;
+    bTop  = ancCy - bH / 2;
+  } else if (vW - ancRight >= bW + marg) {
+    // Fallback: à direita
+    bLeft = ancRight + marg;
+    bTop  = ancCy - bH / 2;
+  } else {
+    // Fallback: abaixo
+    bTop  = ancBottom + marg;
+    bLeft = (ancLeft + ancRight) / 2 - bW / 2;
+  }
+
+  bLeft = Math.max(16, Math.min(bLeft, vW - bW - 16));
+  bTop  = Math.max(16, Math.min(bTop,  vH - bH - 16));
+  balao.style.top  = bTop  + 'px';
+  balao.style.left = bLeft + 'px';
+  _mostrarBalao();
+}
+
 function _posicionarBalao(els) {
   const balao = document.getElementById('tour-balao');
   if (!balao) return;
@@ -6788,24 +8823,29 @@ function _exibirPassoTour(i) {
   const ns = 'http://www.w3.org/2000/svg';
   const mask = svg.querySelector('#tour-mask');
 
-  // ── Fase 1: fade-out suave do balão ──
+  // ── Fase 1: fade-out suave do balão + limpa highlights imediatamente ──
   const balao = document.getElementById('tour-balao');
   _esconderBalao();
+  svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
 
   // ── Fase 2 (após 160ms = duração do fade-out): troca conteúdo + highlight ──
   _tourTimeout(function() {
-
-    svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
 
     // Atualiza conteúdo do balão enquanto está invisível
     document.getElementById('tour-titulo').textContent = passo.titulo;
     document.getElementById('tour-desc').textContent = passo.desc;
     document.getElementById('tour-progresso').textContent = (i + 1) + ' / ' + _tourPassos.length;
+    _tourMenuAtualizar(i);
 
-    const btnAnt  = document.getElementById('tour-btn-ant');
-    const btnProx = document.getElementById('tour-btn-prox');
+    const btnAnt   = document.getElementById('tour-btn-ant');
+    const btnProx  = document.getElementById('tour-btn-prox');
+    const btnPular = document.getElementById('tour-btn-pular');
     btnAnt.style.display = i === 0 ? 'none' : 'flex';
     btnProx.textContent  = i === _tourPassos.length - 1 ? '✓ Concluir' : 'Próximo →';
+    // Garante que os botões apontam para as funções do tour mensal
+    btnProx.onclick = tourProximo;
+    btnAnt.onclick  = tourAnterior;
+    if (btnPular) btnPular.onclick = tourPular;
 
     const rects = els.map(el => _getRectPadded(el, passo));
     const useCircle = !!passo.circulo;
@@ -6911,6 +8951,7 @@ function _exibirPassoTour(i) {
 
 function tourProximo() {
   if (_tourAtual < _tourPassos.length - 1) {
+    if (_tourAtual === 0) _tourMenuMostrar();
     _tourAtual++;
     _exibirPassoTour(_tourAtual);
   } else {
@@ -6934,7 +8975,11 @@ function tourPular() {
   const svg = document.getElementById('tour-overlay');
   svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
   svg.style.display = 'none';
+  document.getElementById('tour-bloqueador').style.display = 'none';
   _esconderBalao();
+  tourFecharIndice();
+  const btnIndice = document.getElementById('tour-btn-indice');
+  if (btnIndice) btnIndice.remove();
   document.body.classList.remove('tour-ativo');
   _restaurarSnapshot();
 }
