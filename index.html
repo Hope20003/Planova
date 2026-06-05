@@ -55,6 +55,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
 </head>
 <body>
+<script>
+  if (localStorage.getItem("planova_dark_mode") === "1") {
+    document.body.classList.add("dark");
+  }
+</script>
 
 <!-- ══════════════════════════════════════════
      SPLASH SCREEN
@@ -188,6 +193,17 @@
     </div>
   </div>
   <div class="topnav-right">
+    <button id="btn-dark-mode" onclick="toggleDarkMode()" aria-label="Modo noturno">
+      <!-- ícone sol (light) -->
+      <svg id="dark-icon-sol" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <!-- trilho do toggle -->
+      <div id="dark-toggle-track">
+        <div id="dark-toggle-thumb"></div>
+      </div>
+      <!-- ícone lua (dark) -->
+      <svg id="dark-icon-lua-right" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <span class="fab-tooltip">Modo noturno</span>
+    </button>
     <div id="salvo-indicator">
       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       Salvo
@@ -508,10 +524,11 @@
       <div class="previsao-card-valor verde" id="p-previsao">R$ 0,00</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:5px;">
         <div class="previsao-card-pct verde" id="p-econpct">0,00%</div>
-        <div class="saldo-info-icon previsao-pct-info-icon" id="previsao-pct-info-icon"></div>
+        <div class="saldo-info-icon previsao-pct-info-icon" id="previsao-pct-info-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8a9cc8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8" stroke-width="3"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+          <div class="saldo-info-tooltip" id="previsao-pct-tooltip">A porcentagem mostra quanto do salário sobrou (ou faltou), sem considerar valores sacados da reserva ou metas. O valor em R$ acima já inclui esses saques.</div>
+        </div>
       </div>
-      <!-- Tooltip filho do card para ancorar abaixo do card inteiro -->
-      <div class="saldo-info-tooltip saldo-info-tooltip--previsao" id="previsao-pct-tooltip">A porcentagem mostra quanto do salário sobrou (ou faltou), sem considerar valores sacados da reserva ou metas. O valor em R$ acima já inclui esses saques.</div>
     </div>
 
     <!-- ── CARD PREVISÃO DE GASTOS ── -->
@@ -720,7 +737,7 @@
     </div>
   </div>
   <div style="font-family:'Outfit','Century Gothic',sans-serif;font-size:15px;font-weight:700;color:#0f1f5c;text-align:center;margin-bottom:4px;letter-spacing:0.1px;">Configurar meta</div>
-  <div style="font-size:11px;color:#8a9cc8;text-align:center;margin-bottom:20px;">Reserva de emergência</div>
+  <div style="margin-bottom:20px;"></div>
 
   <!-- Campo nome -->
   <div class="popup-meta-group">
@@ -803,7 +820,7 @@
 <div id="popup-replicar-overlay"></div>
 <div id="popup-replicar" role="dialog" aria-modal="true">
   <button onclick="fecharPopupReplicar()" style="position:absolute;top:16px;right:16px;background:none;border:none;cursor:pointer;color:#b0bbdb;font-size:20px;line-height:1;padding:0;" onmouseover="this.style.color='#3a6edc'" onmouseout="this.style.color='#b0bbdb'">✕</button>
-  <div class="popup-icone"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#3a6edc" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="15" r="0.8" fill="#3a6edc" stroke="none"/><circle cx="12" cy="15" r="0.8" fill="#3a6edc" stroke="none"/><circle cx="16" cy="15" r="0.8" fill="#3a6edc" stroke="none"/></svg></div>
+  <div class="popup-icone replicar-linha-icone"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#3a6edc" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="15" r="0.8" fill="#3a6edc" stroke="none"/><circle cx="12" cy="15" r="0.8" fill="#3a6edc" stroke="none"/><circle cx="16" cy="15" r="0.8" fill="#3a6edc" stroke="none"/></svg></div>
   <div class="replicar-titulo">Replicar nos próximos meses</div>
   <div class="replicar-subtitulo">Este lançamento será repetido nos próximos meses</div>
   <div class="replicar-preview" id="replicar-preview-info">—</div>
@@ -815,7 +832,11 @@
 
   <div class="parcela-custom-wrap">
     <span class="parcela-custom-label">Digite:</span>
-    <input class="parcela-custom-input" id="parcela-custom-input" type="number" min="1" max="120" autocomplete="off">
+    <div class="parcela-stepper">
+      <button class="parcela-stepper-btn" onclick="stepParcela('parcela-custom-input',-1)">−</button>
+      <input class="parcela-custom-input" id="parcela-custom-input" type="number" min="1" max="120" autocomplete="off">
+      <button class="parcela-stepper-btn" onclick="stepParcela('parcela-custom-input',1)">+</button>
+    </div>
     <span class="parcela-custom-label">parcelas</span>
   </div>
 
@@ -833,7 +854,7 @@
 <div id="popup-replicar-mes-overlay"></div>
 <div id="popup-replicar-mes" role="dialog" aria-modal="true">
   <button onclick="fecharPopupReplicarMes()" style="position:absolute;top:16px;right:16px;background:none;border:none;cursor:pointer;color:#b0bbdb;font-size:20px;line-height:1;padding:0;" onmouseover="this.style.color='#3a6edc'" onmouseout="this.style.color='#b0bbdb'">✕</button>
-  <div class="popup-icone" style="font-size:36px;margin-bottom:8px;"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#3a6edc" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="15" r="0.8" fill="#3a6edc" stroke="none"/><circle cx="12" cy="15" r="0.8" fill="#3a6edc" stroke="none"/><circle cx="16" cy="15" r="0.8" fill="#3a6edc" stroke="none"/></svg></div>
+  <div class="popup-icone replicar-mes-icone" style="font-size:36px;margin-bottom:8px;"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#3a6edc" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="15" r="0.8" fill="#3a6edc" stroke="none"/><circle cx="12" cy="15" r="0.8" fill="#3a6edc" stroke="none"/><circle cx="16" cy="15" r="0.8" fill="#3a6edc" stroke="none"/></svg></div>
   <div class="replicar-titulo">Replicar Gastos do Mês</div>
   <div class="replicar-subtitulo">Todos os gastos deste mês serão copiados a partir do mês seguinte</div>
 
@@ -842,7 +863,11 @@
 
   <div class="parcela-custom-wrap">
     <span class="parcela-custom-label">Digite:</span>
-    <input class="parcela-custom-input" id="parcela-mes-custom-input" type="number" min="1" max="120" autocomplete="off">
+    <div class="parcela-stepper">
+      <button class="parcela-stepper-btn" onclick="stepParcela('parcela-mes-custom-input',-1)">−</button>
+      <input class="parcela-custom-input" id="parcela-mes-custom-input" type="number" min="1" max="120" autocomplete="off">
+      <button class="parcela-stepper-btn" onclick="stepParcela('parcela-mes-custom-input',1)">+</button>
+    </div>
     <span class="parcela-custom-label">meses</span>
   </div>
 
@@ -869,7 +894,7 @@
 <div id="popup-subcategoria-overlay"></div>
 <div id="popup-subcategoria" role="dialog" aria-modal="true">
   <button onclick="fecharPopupSubcategoria()" style="position:absolute;top:16px;right:16px;background:none;border:none;cursor:pointer;color:#b0bbdb;font-size:20px;line-height:1;padding:0;" onmouseover="this.style.color='#3a6edc'" onmouseout="this.style.color='#b0bbdb'">✕</button>
-  <div class="popup-icone"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#3a6edc" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7" stroke-width="3"/></svg></div>
+  <div class="popup-icone"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7" stroke-width="3"/></svg></div>
   <div class="subcategoria-titulo">Adicionar subcategoria</div>
   <div class="subcategoria-subtitulo">Identifique melhor essa despesa.</div>
   <div id="subcategoria-badge" class="subcategoria-categoria-badge">—</div>
@@ -910,7 +935,7 @@
   <div style="font-size:12px;color:#666;text-align:center;margin-bottom:14px;" id="apagar-parcelas-descricao"></div>
   <ul id="apagar-parcelas-lista" style="background:#eef3fb;border:1px solid #c2d3f0;border-radius:8px;padding:10px 14px 10px 28px;font-size:12px;color:#1c3f91;margin:0 0 20px;line-height:1.9;"></ul>
   <div style="display:flex;gap:8px;margin-top:4px;">
-    <button onclick="resolverApagarParcelas(false)" style="flex:1;background:linear-gradient(135deg,#1c3f91,#3a6edc);color:#fff;border:none;border-radius:8px;padding:10px 6px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 3px 10px rgba(58,110,220,0.3);transition:opacity 0.15s;" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Manter</button>
+    <button onclick="resolverApagarParcelas(false)" style="flex:1;border:1.5px solid rgba(58,110,220,0.3);background:none;border-radius:8px;padding:10px 6px;font-size:11px;font-weight:700;font-family:inherit;color:#3a6edc;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='rgba(58,110,220,0.06)'" onmouseout="this.style.background='none'">Manter</button>
     <button onclick="resolverApagarParcelas(true)" style="flex:1;background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border:none;border-radius:8px;padding:10px 6px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 3px 10px rgba(192,57,43,0.3);transition:opacity 0.15s;" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Remover</button>
   </div>
 </div>
@@ -1085,7 +1110,7 @@
       </div>
       <div style="margin-top:10px;padding-left:12px;border-left:2px solid rgba(58,110,220,0.18);display:flex;align-items:center;justify-content:space-between;gap:12px;">
         <span style="font-size:11.5px;font-weight:600;color:#7a8ec0;">Alterar coloração da previsão</span>
-        <div onclick="toggleAlertaCor()" id="toggle-alerta-cor" style="flex-shrink:0;width:36px;height:20px;border-radius:99px;background:#d0d8e8;cursor:pointer;position:relative;transition:background 0.2s;">
+        <div onclick="toggleAlertaCor()" id="toggle-alerta-cor" style="flex-shrink:0;width:36px;height:20px;border-radius:99px;background:#d0d8e8;cursor:pointer;position:relative;transition:background 0.2s;overflow:hidden;">
           <div id="toggle-alerta-cor-thumb" style="position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.2);transition:left 0.2s;"></div>
         </div>
       </div>
@@ -1093,7 +1118,7 @@
 
     <!-- Salvar DENTRO do card -->
     <div style="display:flex;justify-content:flex-end;margin-top:14px;">
-      <button onclick="salvarConfigAlerta();fecharConfig()" style="background:linear-gradient(135deg,#1c3f91,#3a6edc);border:none;border-radius:10px;padding:9px 24px;font-size:12px;font-weight:700;font-family:inherit;color:#fff;cursor:pointer;box-shadow:0 3px 12px rgba(58,110,220,0.28);transition:opacity 0.15s;" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Salvar</button>
+      <button class="btn-config-salvar" onclick="salvarConfigAlerta();fecharConfig()" style="background:linear-gradient(135deg,#1c3f91,#3a6edc);border:none;border-radius:10px;padding:9px 24px;font-size:12px;font-weight:700;font-family:inherit;color:#fff;cursor:pointer;box-shadow:0 3px 12px rgba(58,110,220,0.28);transition:opacity 0.15s;" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Salvar</button>
     </div>
   </div>
 
@@ -1115,7 +1140,7 @@
   <p style="font-size:13px;color:#3a4a6a;line-height:1.65;margin:0 0 22px;">O mês será <strong>bloqueado para edição</strong>. Meses anteriores em aberto também serão fechados em cascata. O saldo acumulado continuará disponível para saques em meses futuros.</p>
   <div style="display:flex;gap:8px;">
     <button onclick="fecharPopupFecharMes()" style="flex:1;border:1.5px solid rgba(58,110,220,0.3);background:none;border-radius:10px;padding:10px 0;font-size:13px;font-weight:700;font-family:inherit;color:#3a6edc;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='rgba(58,110,220,0.06)'" onmouseout="this.style.background='none'">Cancelar</button>
-    <button onclick="confirmarFecharMes()" style="flex:1;background:linear-gradient(135deg,#1c3f91,#3a6edc);border:none;border-radius:10px;padding:10px 0;font-size:13px;font-weight:700;font-family:inherit;color:#fff;cursor:pointer;box-shadow:0 3px 12px rgba(58,110,220,0.28);transition:opacity 0.15s;" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Realizar fechamento contábil</button>
+    <button onclick="confirmarFecharMes()" style="flex:1;background:linear-gradient(135deg,#1c3f91,#3a6edc);border:none;border-radius:10px;padding:10px 0;font-size:13px;font-weight:700;font-family:inherit;color:#fff;cursor:pointer;box-shadow:0 3px 12px rgba(58,110,220,0.28);transition:opacity 0.15s;" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Realizar fechamento</button>
   </div>
 </div>
 
@@ -1419,7 +1444,7 @@
     <table id="simulador-table" style="width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;">
       <colgroup><col style="width:16%"><col style="width:16%"><col style="width:24%"><col style="width:24%"><col style="width:20%"></colgroup>
       <thead>
-        <tr style="background:linear-gradient(to right,#1a2a5e,#2a3f7e);border-bottom:2px solid #d0d8e8;">
+        <tr style="background:linear-gradient(to right,#1a2a5e,#2a3f7e);">
           <th style="color:rgba(255,255,255,0.9);font-weight:700;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;padding:9px 0;text-align:center;white-space:nowrap;">Mês</th>
           <th style="color:rgba(255,255,255,0.9);font-weight:700;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;padding:9px 0;text-align:center;white-space:nowrap;">Inicial</th>
           <th style="color:rgba(255,255,255,0.9);font-weight:700;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;padding:9px 0;text-align:center;white-space:nowrap;"><span style="display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%;"><button onclick="replicarSimTodos('entrada')" class="sim-thead-btn" data-sim-tooltip="Replicar todos" data-sim-tooltip-type="rep" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:13px;cursor:pointer;padding:0 2px;line-height:1;transition:color 0.15s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.6)'">⟳</button>Entrada<button onclick="limparSimColuna('entrada')" class="sim-thead-btn" data-sim-tooltip="Excluir todos" data-sim-tooltip-type="del" style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:13px;cursor:pointer;padding:0 2px;line-height:1;transition:color 0.15s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.6)'">×</button></span></th>
@@ -1459,7 +1484,7 @@
   <p style="font-size:13px;color:#3a4a6a;line-height:1.65;margin:0 0 22px;">Aprenda as <strong>principais funcionalidades</strong> da página passo a passo. Você pode sair a qualquer momento clicando em <strong>encerrar</strong>.</p>
   <div style="display:flex;gap:8px;">
     <button onclick="fecharPopupTour()" style="flex:1;border:1.5px solid rgba(58,110,220,0.3);background:none;border-radius:10px;padding:10px 0;font-size:13px;font-weight:700;font-family:inherit;color:#3a6edc;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='rgba(58,110,220,0.06)'" onmouseout="this.style.background='none'">Agora não</button>
-    <button class="btn-iniciar-tour" onclick="fecharPopupTour();iniciarTour()" style="flex:1;background:linear-gradient(135deg,#1c3f91,#3a6edc);border:none;border-radius:10px;padding:10px 0;font-size:13px;font-weight:700;font-family:inherit;color:#fff;cursor:pointer;box-shadow:0 3px 12px rgba(58,110,220,0.28);transition:opacity 0.15s;" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Iniciar tour</button>
+    <button class="btn-iniciar-tour" onclick="fecharPopupTour();iniciarTour()">Iniciar tour</button>
   </div>
 </div>
 

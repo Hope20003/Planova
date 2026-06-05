@@ -1637,34 +1637,53 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     flex: none;
   }
   .parcela-custom-input {
-    width: 80px;
-    border: 2px solid #dde3f0;
-    border-radius: 8px;
-    padding: 5px 0 5px 10px;
+    width: 56px;
+    border: none;
+    border-radius: 0;
+    padding: 5px 4px;
     font-size: 13px;
     font-weight: 700;
     font-family: inherit;
-    text-align: left;
+    text-align: center;
     outline: none;
     transition: border-color 0.15s;
     color: #222;
     box-sizing: border-box;
+    background: transparent;
   }
-  .parcela-custom-input:focus { border-color: #3a6edc; }
+  .parcela-custom-input:focus { outline: none; }
   .parcela-custom-input::-webkit-outer-spin-button,
   .parcela-custom-input::-webkit-inner-spin-button {
-    -webkit-appearance: inner-spin-button;
-    appearance: auto;
-    opacity: 1;
-    cursor: pointer;
-    background: #eef3fd;
-    border-left: 1.5px solid #dde3f0;
-    width: 22px;
-    margin: 0;
-    border-radius: 0 6px 6px 0;
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
   }
-  .parcela-custom-input::-webkit-inner-spin-button:hover,
-  .parcela-custom-input::-webkit-outer-spin-button:hover { background: #dce8fb; }
+  .parcela-stepper {
+    display: flex;
+    align-items: center;
+    border: 2px solid #dde3f0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .parcela-stepper-btn {
+    width: 28px;
+    height: 30px;
+    border: none;
+    background: #eef3fd;
+    color: #3a6edc;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    flex-shrink: 0;
+    line-height: 1;
+    padding: 0;
+  }
+  .parcela-stepper-btn:hover { background: #dce8fb; }
 
   .replicar-btns {
     display: flex;
@@ -1691,7 +1710,7 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     border: none;
     border-radius: 10px;
     padding: 9px 22px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
@@ -1773,7 +1792,31 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
   .linha input[type="checkbox"] {
     width: 14px; height: 14px;
     cursor: pointer;
-    accent-color: #2234ac;
+    appearance: none;
+    -webkit-appearance: none;
+    background: linear-gradient(135deg, #d6e4f7 0%, #f0f4fb 50%, #dce8f5 100%);
+    border: 1.5px solid #8aaad4;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .linha input[type="checkbox"]:checked {
+    background: linear-gradient(135deg, #d6e4f7 0%, #f0f4fb 50%, #dce8f5 100%);
+    border-color: #3a6edc;
+  }
+
+  .linha input[type="checkbox"]:checked::after {
+    content: "";
+    display: block;
+    width: 7px; height: 4px;
+    border-left: 2px solid #1c3f91;
+    border-bottom: 2px solid #1c3f91;
+    transform: rotate(-45deg);
+    margin-top: -2px;
   }
 
   /* círculo total do bloco */
@@ -2737,6 +2780,7 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     box-sizing: border-box;
     display: flex;
     align-items: center;
+    justify-content: center;
     user-select: none;
     white-space: nowrap;
     overflow: hidden;
@@ -2786,6 +2830,7 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     color: #1a2a5e;
     white-space: nowrap;
     transition: background 0.1s, color 0.1s;
+    text-align: center;
   }
   .popup-meta-drop-item:hover { background: #eef3fd; color: #1c3f91; }
   .popup-meta-drop-item.ativo { background: #e8effe; color: #1c3f91; font-weight: 700; }
@@ -2811,6 +2856,16 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     background: linear-gradient(135deg, #1c3f91, #3a6edc);
     border-color: transparent;
     color: #fff;
+  }
+  body.dark .popup-diario-entrada-btn {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.13);
+    color: rgba(255,255,255,0.7);
+  }
+  body.dark .popup-diario-entrada-btn.ativo {
+    background: linear-gradient(135deg, #2a52b0, #4a7ed8) !important;
+    border-color: transparent !important;
+    color: #fff !important;
   }
 
   /* ── Input-dropdown do popup diário ── */
@@ -2839,7 +2894,7 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     padding: 13px 16px 14px;
     box-shadow: 0 2px 12px rgba(28,63,145,0.10);
     position: relative;
-    overflow: hidden;
+    overflow: visible;
     text-align: center;
     min-height: 90px;
     display: flex;
@@ -3102,6 +3157,7 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     padding: 9px 12px;
     border-radius: 8px;
     width: 220px;
+    border: 1px solid rgba(100,140,220,0.35);
     box-shadow: 0 4px 16px rgba(28,63,145,0.25);
     pointer-events: none;
     z-index: 9999;
@@ -3111,6 +3167,16 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     visibility: hidden;
     transition: opacity 0.18s ease, visibility 0s linear 0.18s;
     transition-delay: 0s, 0s;
+  }
+  .saldo-info-tooltip::before {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(100,140,220,0.35);
+    pointer-events: none;
   }
   .saldo-info-tooltip::after {
     content: '';
@@ -3127,9 +3193,14 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     right: -4px;
     transform: none;
   }
+  .saldo-info-tooltip--left::before {
+    left: auto;
+    right: 6px;
+    transform: none;
+  }
   .saldo-info-tooltip--left::after {
     left: auto;
-    right: 8px;
+    right: 7px;
     transform: none;
   }
   /* Delay de 500ms antes de aparecer */
@@ -3235,50 +3306,12 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
   /* ── ÍCONE INFO NA % DE PREVISÃO DE SALDO ── */
   /* Posicionado absolutamente no canto do card para não quebrar o text-align:center */
   /* Row inline que agrupa % + ícone, centralizado no card */
-  /* Card de saldo sem overflow:hidden para o tooltip escapar */
-  /* Card de saldo: overflow visible para tooltip escapar, position relative como âncora */
-  .previsao-card--saldo {
-    overflow: visible;
-  }
-
-  /* Row: texto centralizado, posição relativa para ícone absoluto */
-  .previsao-pct-row {
-    position: relative;
-    text-align: center;
-    display: block;
-  }
-
   /* Ícone logo à direita do valor principal, dentro do flex */
   .previsao-pct-info-icon {
     flex-shrink: 0;
-    display: flex;
+    position: relative;
+    display: inline-flex;
     align-items: center;
-  }
-
-  /* Tooltip ancorado no CARD (não no ícone): posição relativa ao .previsao-card--saldo
-     top: 100% = borda inferior do card + gap */
-  .previsao-card--saldo .saldo-info-tooltip--previsao {
-    position: absolute;
-    bottom: auto;
-    top: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%);
-    right: auto;
-  }
-  .saldo-info-tooltip--previsao::after {
-    top: auto;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    right: auto;
-    border-top-color: transparent;
-    border-bottom-color: #1a2a5e;
-  }
-  /* Hover no ícone de previsão: mostra tooltip que é filho do card */
-  .previsao-card--saldo:has(.previsao-pct-info-icon:hover) .saldo-info-tooltip--previsao {
-    opacity: 1;
-    visibility: visible;
-    transition: opacity 0.18s ease 0.5s, visibility 0s linear 0.5s;
   }
 /* ══ TOPNAV TABS ══ */
 .topnav-tabs {
@@ -3903,6 +3936,8 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
 #simulador-tbody tr { border-bottom: 1px solid #eef3fd; transition: background 0.12s; }
 #simulador-tbody tr:last-child { border-bottom: none; }
 #simulador-tbody tr:hover { background: #f5f8fd; }
+.sim-cel-mes { color: #1a2a5e; }
+.sim-cel-inicial { color: #6a7aaa; }
 
 /* ══ SIMULADOR — célula: input centralizado, botões absolutos nos cantos ══ */
 .sim-td-cel {
@@ -4531,3 +4566,957 @@ div:hover > .fab-tooltip {
 #tour-indice-lista::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 4px; }
 #tour-indice-lista::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 4px; }
 #tour-indice-lista::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.45); }
+/* ══════════════════════════════════════════════════════════════════
+   26. MODO NOTURNO — body.dark
+   Fundo: gradiente azul profundo (igual ao tour/topnav).
+   Regra central: tudo que era azul vira branco/translúcido,
+   pois o fundo já é azul. Inputs/selects sem borda = menos poluição.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Botão lua/sol na topnav ── */
+/* ── Toggle dark mode ── */
+#btn-dark-mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: rgba(255,255,255,0.75);
+  flex-shrink: 0;
+  position: relative;
+  transition: color 0.2s;
+}
+#btn-dark-mode:hover {
+  color: rgba(255,255,255,1);
+}
+#btn-dark-mode:hover svg {
+  /* sem rotate no hover agora */
+}
+/* Trilho */
+#dark-toggle-track {
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: rgba(255,255,255,0.18);
+  border: 1.5px solid rgba(255,255,255,0.25);
+  position: relative;
+  transition: background 0.28s, border-color 0.28s;
+  flex-shrink: 0;
+}
+body.dark #dark-toggle-track {
+  background: rgba(58,110,220,0.75);
+  border-color: rgba(100,150,255,0.9);
+  box-shadow: 0 0 0 1px rgba(100,150,255,0.35);
+}
+/* Bolinha */
+#dark-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  transition: transform 0.28s cubic-bezier(0.34,1.2,0.64,1);
+}
+body.dark #dark-toggle-thumb {
+  transform: translateX(18px);
+  color: #1c3f91;
+}
+/* Ícone sol (esquerda) — visível no modo claro */
+#dark-icon-sol { opacity: 0.8; transition: opacity 0.2s; }
+body.dark #dark-icon-sol { opacity: 0.45; }
+/* Ícone lua (direita) — visível no modo escuro */
+#dark-icon-lua-right { opacity: 0.45; transition: opacity 0.2s; }
+body.dark #dark-icon-lua-right { opacity: 0.9; }
+#btn-dark-mode .fab-tooltip {
+  white-space: nowrap;
+  font-size: 10.5px;
+  bottom: auto;
+  top: calc(100% + 10px);
+  transform: translateX(-50%) translateY(4px);
+}
+#btn-dark-mode .fab-tooltip::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #1a2a5e;
+}
+button:hover > #btn-dark-mode .fab-tooltip,
+#btn-dark-mode:hover .fab-tooltip {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Fundo da página ── */
+body.dark {
+  background: linear-gradient(150deg, #060c1e 0%, #0a102d 35%, #0d1845 65%, #0f1f5c 100%);
+  background-attachment: fixed;
+}
+
+/* ── Scrollbar ── */
+body.dark::-webkit-scrollbar-track { background: rgba(6,13,40,0.8); }
+body.dark::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 6px; }
+body.dark::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.32); }
+
+/* ── Título do mês ── */
+body.dark #titulomes,
+body.dark #diario-titulomes { color: rgba(255,255,255,0.92); }
+body.dark #titulomes:hover,
+body.dark #diario-titulomes:hover { color: #fff; }
+body.dark #mes-dropdown-wrap.aberto #titulomes,
+body.dark #diario-mes-dropdown-wrap.aberto #diario-titulomes { color: #fff; }
+body.dark #titulomes::after,
+body.dark #diario-titulomes::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.6)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* ── Dropdowns de mês ── */
+body.dark #mes-dropdown-list,
+body.dark #diario-mes-dropdown-list {
+  background: #0d1845;
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+body.dark .mes-dropdown-item,
+body.dark .diario-mes-dropdown-item { background: transparent; color: rgba(255,255,255,0.75); }
+body.dark .mes-dropdown-item:hover,
+body.dark .diario-mes-dropdown-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+body.dark .mes-dropdown-item.ativo,
+body.dark .diario-mes-dropdown-item.ativo { background: rgba(255,255,255,0.15); color: #fff; font-weight: 700; }
+
+/* ── Botões < > do mês ── */
+body.dark .btn-mes {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow: none;
+}
+body.dark .btn-mes:hover { background: rgba(255,255,255,0.22); color: #fff; box-shadow: none; }
+
+/* ── Botão replicar mês e fechar mês ── */
+body.dark .btn-replicar-linha { color: rgba(255,255,255,0.4); }
+body.dark .btn-replicar-linha:hover {
+  color: #7eb3ff;
+  background: rgba(100,160,255,0.15);
+}
+body.dark .replicar-tooltip {
+  background: linear-gradient(135deg, #1a2f6e, #2a4a9e);
+  color: #c8dcff;
+  border-color: rgba(100,160,255,0.4);
+}
+body.dark .replicar-tooltip::after {
+  background: #2a4a9e;
+  border-color: rgba(100,160,255,0.4);
+}
+body.dark .btn-replicar-mes,
+body.dark .btn-fechar-mes {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.8);
+  box-shadow: none;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+body.dark .btn-replicar-mes:hover,
+body.dark .btn-fechar-mes:hover { background: rgba(255,255,255,0.22); color: #fff; }
+body.dark .btn-fechar-mes.mes-fechado {
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  box-shadow: none;
+}
+
+/* ══ CABEÇALHOS DOS BLOCOS ══
+   h3 e gaveta fechada com mesma opacidade — gaveta some atrás do h3 */
+/* h3 sólido escuro — tampa a gaveta. Gaveta fechada mais clara = aparece
+   só a franjinha visível à direita, criando o detalhe cinza do header */
+body.dark .bloco-header-wrap > h3,
+body.dark .bloco-wrap > h3 {
+  background: #162554;
+  color: rgba(255,255,255,0.7);
+  border-left-color: rgba(255,255,255,0.3);
+  box-shadow: none;
+}
+body.dark .bloco-header-wrap > h3:hover { background: #1c2f68; }
+body.dark .bloco-header-wrap.aberto > h3 { background: #1c2f68; }
+
+/* Gaveta fechada: mais clara que o h3 — a franjinha visível
+   à direita cria o efeito do detalhe cinza */
+body.dark .bloco-gaveta {
+  background: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.8);
+}
+body.dark .bloco-header-wrap:not(.aberto):hover .bloco-gaveta {
+  background: rgba(255,255,255,0.38);
+}
+/* Aberta: mesma cor cinza da fechada */
+body.dark .bloco-header-wrap.aberto .bloco-gaveta {
+  background: rgba(255,255,255,0.3);
+  color: #fff;
+  box-shadow: 4px 2px 8px rgba(0,0,0,0.3);
+}
+
+/* ══ LINHAS — sem bordas, só texto. Menos poluição visual ══ */
+body.dark .salario-input {
+  border-image: linear-gradient(to right, transparent, rgba(255,255,255,0.25) 25%, rgba(255,255,255,0.25) 75%, transparent) 1;
+}
+body.dark .salario-input:focus {
+  border-image: linear-gradient(to right, transparent, rgba(58,110,220,0.6) 20%, rgba(58,110,220,0.8) 50%, rgba(58,110,220,0.6) 80%, transparent) 1;
+}
+body.dark .linha select {
+  background-color: transparent;
+  border-color: transparent;
+  color: rgba(255,255,255,0.75);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+body.dark .linha select option { background: #0d1845; color: #fff; }
+body.dark .linha select:focus {
+  border-color: rgba(255,255,255,0.3);
+  box-shadow: none;
+  background-color: rgba(255,255,255,0.06);
+}
+body.dark .linha .val-input {
+  color: rgba(255,255,255,0.75);
+  border-image: linear-gradient(to right, transparent, rgba(255,255,255,0.18) 25%, rgba(255,255,255,0.18) 75%, transparent) 1;
+  border-bottom: 1.5px solid transparent;
+}
+body.dark .linha .val-input::placeholder { color: rgba(255,255,255,0.2); }
+body.dark .linha .val-input:focus {
+  border-image: linear-gradient(to right, transparent, rgba(58,110,220,0.6) 20%, rgba(58,110,220,0.8) 50%, rgba(58,110,220,0.6) 80%, transparent) 1;
+  border-bottom: 1.5px solid transparent;
+}
+
+/* ── Checkboxes das linhas: opacos para não chamar atenção ── */
+body.dark .linha input[type="checkbox"] {
+  background: linear-gradient(150deg, #060d28 0%, #0a1540 35%, #0f1f5c 65%, #1c3f91 100%);
+  border-color: rgba(255,255,255,0.25);
+  opacity: 1;
+}
+body.dark .linha input[type="checkbox"]:checked {
+  background: linear-gradient(150deg, #060d28 0%, #0a1540 35%, #0f1f5c 65%, #1c3f91 100%);
+  border-color: rgba(255,255,255,0.6);
+}
+body.dark .linha input[type="checkbox"]:checked::after {
+  border-left-color: rgba(255,255,255,0.85);
+  border-bottom-color: rgba(255,255,255,0.85);
+}
+
+/* ── Select banco customizado — sem borda ── */
+body.dark .select-banco-display {
+  background-color: transparent;
+  border-color: transparent;
+  color: rgba(255,255,255,0.75);
+}
+body.dark .select-banco-display.vazio { color: rgba(255,255,255,0.3); }
+body.dark .select-banco-display:hover { background-color: rgba(255,255,255,0.06); border-color: transparent; }
+body.dark .select-banco-display::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+body.dark .select-banco-list {
+  background: #0d1845;
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+body.dark .select-banco-list::-webkit-scrollbar-track { background: rgba(6,13,40,0.8); border-radius: 4px; }
+body.dark .select-banco-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 4px; }
+body.dark .select-banco-list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.32); }
+body.dark .select-banco-item { background: transparent; color: rgba(255,255,255,0.75); }
+body.dark .select-banco-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+body.dark .select-banco-item.highlighted { background: rgba(255,255,255,0.15); color: #fff; }
+body.dark .select-banco-search {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.88);
+  border-bottom-color: rgba(255,255,255,0.12);
+}
+body.dark .select-banco-search::placeholder { color: rgba(255,255,255,0.3); }
+
+/* ══ CÍRCULOS DE SUBTOTAL ══ */
+body.dark .circulo-subtotal {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.9);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+body.dark .circulo-progress-bg { stroke: rgba(255,255,255,0.12); }
+body.dark .circulo-progress-ring.alerta { stroke: #b03a39; }
+body.dark .circulo-livre-badge {
+  color: #5ee87a;
+  background: rgba(46,125,50,0.2);
+  border-color: rgba(46,125,50,0.35);
+}
+
+/* ══ PAINEL DIREITA ══ */
+body.dark .painel-circulo {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.9);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+body.dark .painel-btn,
+body.dark .painel-reserva-btn {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.75);
+  border-left-color: rgba(255,255,255,0.3);
+  box-shadow: none;
+}
+
+/* ── Cards Previsão ── */
+body.dark .previsao-card {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+}
+body.dark .previsao-card-titulo { color: rgba(255,255,255,0.45); }
+
+/* ── Cards Reserva e Meta ── */
+body.dark .reserva-card,
+body.dark .meta-card {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+}
+body.dark .reserva-card-titulo { color: rgba(255,255,255,0.45); }
+body.dark .reserva-card-saldo { color: rgba(255,255,255,0.3) !important; }
+body.dark .reserva-card-saldo.verde { color: #1f7a1f !important; }
+body.dark .reserva-card-btn {
+  background: rgba(34,139,230,0.22);
+  color: #7ec8ff;
+  border-color: rgba(34,139,230,0.35);
+}
+body.dark .reserva-card-btn:hover {
+  background: rgba(34,139,230,0.38);
+  border-color: rgba(34,139,230,0.6);
+}
+body.dark .reserva-card-btn.retirar {
+  background: rgba(192,57,43,0.22);
+  color: #ff9999;
+  border-color: rgba(192,57,43,0.3);
+}
+body.dark .reserva-card-btn.retirar:hover {
+  background: rgba(192,57,43,0.38);
+  border-color: rgba(231,76,60,0.5);
+}
+body.dark .reserva-valor {
+  color: rgba(255,255,255,0.5);
+}
+body.dark .reserva-valor.verde { color: #5ee87a; }
+body.dark .reserva-valor.verde::placeholder { color: #5ee87a; opacity: 1; }
+body.dark .reserva-valor.vermelho { color: #ff9999; }
+body.dark .reserva-valor.vermelho::placeholder { color: #ff9999; opacity: 1; }
+body.dark .painel-circulo.vermelho { color: #b03a39; }
+body.dark .previsao-card-valor.vermelho,
+body.dark .previsao-card-pct.vermelho { color: #b03a39; }
+
+/* ── Pilha de metas ── */
+body.dark .meta-card-stack.s1 {
+  background: #0d1a4e;
+  border-color: rgba(255,255,255,0.09);
+}
+body.dark .meta-card-stack.s2 {
+  background: #0b1640;
+  border-color: rgba(255,255,255,0.06);
+}
+body.dark .meta-card-nome { color: rgba(255,255,255,0.9); }
+body.dark .meta-card-counter { color: rgba(255,255,255,0.35); }
+body.dark .meta-nav-dot { background: rgba(255,255,255,0.2); }
+body.dark .meta-nav-dot.ativo { background: rgba(255,255,255,0.75); }
+body.dark .meta-card-nav-btn {
+  border-color: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.5);
+}
+body.dark .meta-card-nav-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.3);
+  color: #fff;
+}
+
+/* ── Barra de progresso reserva ── */
+body.dark .reserva-progresso-wrap {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+  box-shadow: none;
+}
+body.dark .reserva-prog-track { background: rgba(255,255,255,0.1); }
+body.dark .reserva-prog-label,
+body.dark .reserva-prog-meta-label { color: rgba(255,255,255,0.4); }
+body.dark .reserva-prog-atual { color: rgba(255,255,255,0.7); }
+body.dark .reserva-meta-input {
+  color: rgba(255,255,255,0.75);
+  border-bottom-color: rgba(255,255,255,0.2);
+}
+body.dark .reserva-meta-input:focus { color: #fff; border-bottom-color: rgba(255,255,255,0.6); }
+body.dark .reserva-meta-input::placeholder { color: rgba(255,255,255,0.22); }
+body.dark .reserva-prog-meta-display { color: rgba(255,255,255,0.45); }
+body.dark .reserva-prog-prazo-row { border-top-color: rgba(255,255,255,0.1); }
+body.dark .reserva-prog-prazo-txt { color: rgba(255,255,255,0.4); }
+
+/* ── Card vazio meta ── */
+body.dark .meta-vazio-card {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+  box-shadow: none;
+}
+body.dark .meta-vazio-texto { color: rgba(255,255,255,0.5); }
+body.dark .meta-vazio-btn { color: rgba(255,255,255,0.7); }
+
+/* ── Separador vertical ── */
+body.dark .separador::before {
+  background: linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.12) 70%, transparent 100%);
+}
+body.dark .separador::after {
+  background: linear-gradient(to right, rgba(255,255,255,0.05) 0%, transparent 100%);
+}
+
+/* ── Botão simulador anual (dark) ── */
+body.dark .btn-simulador-anual:hover {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.9);
+  border-color: rgba(255,255,255,0.25);
+}
+body.dark .btn-simulador-anual-tooltip {
+  background: linear-gradient(135deg, #1a2f6e, #2a4a9e);
+  color: #e0ecff;
+  border-color: rgba(120,160,255,0.5);
+}
+body.dark .btn-simulador-anual-tooltip::after {
+  background: #2a4a9e;
+  border-color: rgba(120,160,255,0.5);
+}
+
+/* ══ DIÁRIO ══ */
+body.dark .diario-titulo { color: rgba(255,255,255,0.92); }
+body.dark .diario-periodo-label { color: rgba(255,255,255,0.85); }
+body.dark .diario-periodo-valor { color: rgba(255,255,255,0.5); }
+body.dark .diario-data-atual {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.6);
+}
+body.dark .diario-table-wrap {
+  border-color: rgba(255,255,255,0.1);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+body.dark .diario-table td {
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.8);
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+body.dark .diario-table tbody tr:hover td { background: rgba(255,255,255,0.08); }
+body.dark .diario-table tbody tr.diario-row-hoje td { background: rgba(255,255,255,0.08); }
+body.dark .diario-table tbody tr.diario-row-hoje td:first-child {
+  border-left-color: rgba(255,255,255,0.5);
+  color: #fff;
+}
+body.dark .diario-saida-input {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.15);
+  color: #ff9999;
+}
+body.dark .diario-table td.diario-td-disponivel { color: #5ee87a; }
+body.dark .diario-table td.diario-td-disponivel.negativo { color: #ff9999; }
+body.dark .diario-vazio-card {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+  box-shadow: none;
+}
+body.dark .diario-vazio-titulo { color: rgba(255,255,255,0.92); }
+body.dark .diario-vazio-desc { color: rgba(255,255,255,0.5); }
+
+/* ══ POPUPS ══ */
+body.dark #popup-replicar,
+body.dark #popup-replicar-mes,
+body.dark #popup-subcategoria,
+body.dark #popup-conflito,
+body.dark #popup-apagar-parcelas,
+body.dark #popup-cobrir,
+body.dark #popup-config,
+body.dark #popup-fechar-mes,
+body.dark #popup-reabrir-mes,
+body.dark #popup-alterar-salario,
+body.dark #popup-movimento,
+body.dark #popup-meta,
+body.dark #popup-importar-confirm,
+body.dark #popup-excluir-meta,
+body.dark #popup-simulador,
+body.dark #popup-tour,
+body.dark #popup-sobrescrever-mes,
+body.dark #popup-diario,
+body.dark #popup-diario-excluir {
+  background: #1e3a6e !important;
+  border: 1px solid rgba(255,255,255,0.22);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.88);
+}
+/* Textos genéricos dentro de popups no dark */
+body.dark #popup-fechar-mes *,
+body.dark #popup-reabrir-mes *,
+body.dark #popup-alterar-salario *,
+body.dark #popup-importar-confirm *,
+body.dark #popup-conflito *,
+body.dark #popup-apagar-parcelas *,
+body.dark #popup-sobrescrever-mes *,
+body.dark #popup-excluir-meta *,
+body.dark #popup-movimento *,
+body.dark #popup-diario *,
+body.dark #popup-diario-excluir * {
+  color: rgba(255,255,255,0.88) !important;
+}
+/* SVG do ícone do popup-movimento no dark */
+body.dark #popup-movimento-icone svg {
+  stroke: rgba(255,255,255,0.85) !important;
+  fill: none !important;
+}
+body.dark #popup-movimento-icone div {
+  background: rgba(255,255,255,0.12) !important;
+}
+/* Botão sacar tudo no dark — vermelho legível */
+body.dark #popup-movimento-sacar-tudo {
+  color: #ff8a80 !important;
+  background: rgba(255,100,80,0.12) !important;
+  border-color: rgba(255,100,80,0.3) !important;
+}
+/* Botão depositar tudo no dark */
+body.dark #popup-movimento-depositar-tudo {
+  color: #90c8ff !important;
+  background: rgba(90,160,255,0.12) !important;
+  border-color: rgba(90,160,255,0.3) !important;
+}
+/* Ícone do cadeado: fundo e stroke nítidos no dark */
+body.dark #popup-fechar-mes div[style*="border-radius:12px"],
+body.dark #popup-reabrir-mes div[style*="border-radius:12px"] {
+  background: rgba(255,255,255,0.15) !important;
+}
+body.dark #popup-fechar-mes svg,
+body.dark #popup-reabrir-mes svg {
+  stroke: rgba(255,255,255,0.9) !important;
+}
+/* Lista de meses no popup de apagar parcelas — dark mode */
+body.dark #apagar-parcelas-lista {
+  background: rgba(255,255,255,0.07) !important;
+  border-color: rgba(255,255,255,0.18) !important;
+  color: rgba(255,255,255,0.88) !important;
+}
+body.dark #apagar-parcelas-lista li,
+body.dark #apagar-parcelas-lista strong {
+  color: rgba(255,255,255,0.88) !important;
+}
+body.dark #popup-fechar-mes strong,
+body.dark #popup-reabrir-mes strong,
+body.dark #popup-conflito strong,
+body.dark #popup-apagar-parcelas strong,
+body.dark #popup-sobrescrever-mes strong,
+body.dark #popup-excluir-meta strong,
+body.dark #popup-diario strong,
+body.dark #popup-diario-excluir strong { color: #fff !important; }
+/* Botões de confirmação azul nos popups — gradiente invertido no dark para não sumir */
+body.dark #popup-fechar-mes button[style*="linear-gradient"],
+body.dark #popup-reabrir-mes button[style*="linear-gradient"],
+body.dark #popup-alterar-salario button[style*="linear-gradient"],
+body.dark #popup-importar-confirm button[style*="linear-gradient"],
+body.dark #popup-conflito button[style*="linear-gradient"],
+body.dark #popup-apagar-parcelas button[style*="linear-gradient"],
+body.dark #popup-sobrescrever-mes button[style*="linear-gradient"],
+body.dark #popup-excluir-meta button[style*="linear-gradient"],
+body.dark #popup-diario button[style*="linear-gradient"],
+body.dark #popup-diario-excluir button[style*="linear-gradient"],
+body.dark #popup-simulador button[style*="linear-gradient"],
+body.dark #popup-movimento button[style*="linear-gradient"],
+body.dark #popup-meta button[style*="linear-gradient"],
+body.dark #popup-tour button[style*="linear-gradient"] {
+  background: linear-gradient(135deg, #2a52b0, #4a7ed8) !important;
+  box-shadow: 0 3px 14px rgba(58,110,220,0.35) !important;
+}
+body.dark #popup-tour button[style*="linear-gradient"]:hover {
+  opacity: 0.88 !important;
+}
+body.dark .btn-replicar-confirmar {
+  background: linear-gradient(135deg, #2a52b0, #4a7ed8) !important;
+  box-shadow: 0 3px 14px rgba(58,110,220,0.35) !important;
+}
+body.dark .btn-subcategoria-confirmar {
+  background: linear-gradient(135deg, #2a52b0, #4a7ed8) !important;
+  box-shadow: 0 3px 14px rgba(58,110,220,0.35) !important;
+}
+body.dark .replicar-mes-icone svg { stroke: #ffffff !important; }
+body.dark .replicar-mes-icone svg circle { fill: #ffffff !important; }
+body.dark .replicar-linha-icone svg { stroke: #ffffff !important; }
+body.dark .replicar-linha-icone svg circle { fill: #ffffff !important; }
+body.dark .replicar-titulo,
+body.dark .subcategoria-titulo { color: rgba(255,255,255,0.95); }
+body.dark .replicar-subtitulo,
+body.dark .subcategoria-subtitulo,
+body.dark .replicar-label,
+body.dark .parcela-custom-label { color: rgba(255,255,255,0.5); }
+body.dark .replicar-preview {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.78);
+}
+body.dark .replicar-preview strong { color: #fff; }
+body.dark .parcela-btn {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.8);
+}
+body.dark .parcela-btn:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
+body.dark .parcela-btn.ativo {
+  background: rgba(255,255,255,0.88);
+  border-color: transparent;
+  color: #0a1540;
+}
+body.dark .parcela-custom-input {
+  background: transparent;
+  border-color: transparent;
+  color: rgba(255,255,255,0.88);
+}
+body.dark .parcela-stepper {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.14);
+}
+body.dark .parcela-stepper-btn {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+}
+body.dark .parcela-stepper-btn:hover {
+  background: rgba(255,255,255,0.22);
+}
+body.dark .btn-replicar-cancelar,
+body.dark .btn-subcategoria-cancelar {
+  border-color: rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.5);
+}
+body.dark .btn-replicar-cancelar:hover,
+body.dark .btn-subcategoria-cancelar:hover {
+  border-color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.8);
+}
+body.dark .subcategoria-input {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.9);
+}
+body.dark .subcategoria-input:focus { border-color: rgba(255,255,255,0.45); }
+body.dark .cobrir-opcao {
+  border-color: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.8);
+}
+body.dark #popup-cobrir-resumo {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+body.dark #popup-cobrir-deficit { color: #b03a39 !important; }
+body.dark #popup-cobrir-valor { color: rgba(255,255,255,0.9) !important; }
+body.dark #popup-cobrir [style*="color:#0f1f5c"] { color: rgba(255,255,255,0.95) !important; }
+body.dark #popup-cobrir [style*="color:#8a9cc8"] { color: rgba(255,255,255,0.45) !important; }
+body.dark #popup-cobrir [style*="color:#b0bbdb"] { color: rgba(255,255,255,0.35) !important; }
+body.dark #popup-cobrir-confirmar {
+  background: linear-gradient(135deg, #2a52b0, #4a7ed8) !important;
+  box-shadow: 0 3px 14px rgba(58,110,220,0.35) !important;
+}
+body.dark #popup-cobrir-dest-b1,
+body.dark #popup-cobrir-dest-b2 { color: rgba(255,255,255,0.6) !important; border-color: rgba(255,255,255,0.15) !important; }
+body.dark .cobrir-opcao:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.28); }
+body.dark .cobrir-opcao.ativa { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.35); }
+body.dark .cobrir-opcao-label { color: rgba(255,255,255,0.92); }
+body.dark .cobrir-opcao-saldo { color: rgba(255,255,255,0.6); }
+body.dark .cobrir-opcao input[type=radio],
+body.dark .cobrir-opcao input[type=checkbox] {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.22);
+}
+body.dark .cobrir-opcao input[type=radio]:checked,
+body.dark .cobrir-opcao input[type=checkbox]:checked {
+  background: rgba(255,255,255,0.85);
+  border-color: transparent;
+  box-shadow: inset 0 0 0 3px #0d1845;
+}
+body.dark .popup-meta-label { color: rgba(255,255,255,0.48); }
+/* SVG e título do popup-meta no dark */
+body.dark #popup-meta svg { stroke: rgba(255,255,255,0.85) !important; }
+body.dark #popup-meta div[style*="background:linear-gradient"] {
+  background: rgba(255,255,255,0.12) !important;
+}
+body.dark #popup-meta div[style*="color:#0f1f5c"] {
+  color: rgba(255,255,255,0.92) !important;
+}
+body.dark #popup-meta div[style*="color:#8a9cc8"] {
+  color: rgba(255,255,255,0.45) !important;
+}
+body.dark .popup-meta-input {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.9);
+}
+body.dark .popup-meta-input::placeholder { color: rgba(255,255,255,0.22); }
+body.dark .popup-meta-input:focus { border-color: rgba(255,255,255,0.4); }
+body.dark .popup-cat-btn {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.7);
+}
+body.dark .popup-cat-btn:hover,
+body.dark .popup-cat-btn.ativo {
+  background: rgba(255,255,255,0.16);
+  border-color: rgba(255,255,255,0.35);
+  color: #fff;
+}
+body.dark .popup-meta-drop-display {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.88);
+}
+body.dark .popup-meta-drop-display.vazio { color: rgba(255,255,255,0.28); }
+body.dark .popup-meta-drop-display::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+body.dark .popup-meta-drop-list {
+  background: #0d1845;
+  border-color: rgba(255,255,255,0.12);
+}
+body.dark .popup-meta-drop-item { background: transparent; color: rgba(255,255,255,0.72); }
+body.dark .popup-meta-drop-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
+body.dark .popup-meta-drop-item.ativo { background: rgba(255,255,255,0.14); color: #fff; }
+body.dark .popup-diario-entrada-btn {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.13);
+  color: rgba(255,255,255,0.7);
+}
+body.dark .popup-diario-entrada-btn:hover { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.92); }
+body.dark .popup-diario-entrada-btn.ativo {
+  background: linear-gradient(135deg, #2a52b0, #4a7ed8) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+body.dark .popup-diario-input-drop {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.9);
+}
+body.dark .popup-diario-input-drop::placeholder { color: rgba(255,255,255,0.28); }
+body.dark .popup-diario-input-drop:focus { border-color: rgba(255,255,255,0.4); }
+
+/* ── Dropdown de ano ── */
+body.dark #ano-dropdown-list {
+  background: #0d1845 !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.6) !important;
+}
+
+/* ── Toast ── */
+body.dark #toast-aviso,
+body.dark .toast-sistema {
+  background: #0d1845 !important;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+}
+body.dark .toast-titulo { color: #b03a39; }
+body.dark .toast-msg { color: rgba(255,255,255,0.7); }
+body.dark .toast-icone-wrap { background: rgba(176,58,57,0.2); }
+body.dark .toast-icone-wrap span { color: #b03a39; }
+body.dark .toast-fechar { color: rgba(255,255,255,0.4); }
+body.dark .toast-fechar:hover { color: rgba(255,255,255,0.8); }
+
+/* ── Simulador ── */
+/* Título e SVG do cabeçalho */
+body.dark #popup-simulador div[style*="color:#0f1f5c"] { color: rgba(255,255,255,0.92) !important; }
+body.dark #popup-simulador div[style*="color:#8a9cc8"] { color: rgba(255,255,255,0.45) !important; }
+body.dark #popup-simulador div[style*="background:rgba(28,63,145,0.08)"] { background: rgba(255,255,255,0.10) !important; }
+body.dark #popup-simulador svg[stroke="#1c3f91"] { stroke: rgba(255,255,255,0.85) !important; }
+/* Borda da tabela */
+body.dark #popup-simulador div[style*="border-left:1.5px"] { border-color: rgba(255,255,255,0.12) !important; }
+/* Nomes dos meses e coluna inicial */
+body.dark .sim-cel-mes { color: rgba(255,255,255,0.88) !important; }
+body.dark .sim-cel-inicial { color: rgba(255,255,255,0.50) !important; }
+/* Linhas do tbody */
+body.dark #simulador-tbody tr { border-bottom-color: rgba(255,255,255,0.07); }
+body.dark #simulador-tbody tr:hover { background: rgba(255,255,255,0.06) !important; }
+/* Inputs de entrada/saída no dark */
+body.dark .sim-input { background: transparent; color: rgba(255,255,255,0.75); }
+body.dark .sim-input-entrada { color: #5ecf7a !important; }
+body.dark .sim-input-entrada::placeholder { color: rgba(94,207,122,0.3) !important; }
+body.dark .sim-input-saida { color: #ff7f7f !important; }
+body.dark .sim-input-saida::placeholder { color: rgba(255,127,127,0.3) !important; }
+/* Linha do mês atual destacada */
+body.dark #simulador-tbody tr.sim-row-atual { background: rgba(255,255,255,0.10) !important; }
+body.dark #simulador-tbody tr.sim-row-atual:hover { background: rgba(255,255,255,0.14) !important; }
+body.dark .btn-subtotal {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.75);
+  border-left-color: rgba(255,255,255,0.3);
+  box-shadow: none;
+}
+
+/* ── Transição suave ao ligar/desligar ── */
+body, body *, body ::before, body ::after {
+  transition-property: background-color, background, border-color, color, box-shadow, opacity;
+  transition-duration: 0.22s;
+  transition-timing-function: ease;
+}
+body .bloco-gaveta { transition: left 0.28s cubic-bezier(0.34, 1.15, 0.64, 1), background 0.22s, color 0.22s; }
+/* Restaura transições que o bloco global (body *) sobrescreveria */
+body .circulo-progress-ring { transition: stroke-dashoffset 0.4s ease, stroke 0.3s ease; }
+body #salvo-indicator,
+body #ano-flash-label,
+body .reserva-prog-fill { transition: unset; }
+body .meta-card-stack { transition: margin-top 0.28s cubic-bezier(0.34,1.2,0.64,1), box-shadow 0.2s, transform 0.28s cubic-bezier(0.34,1.2,0.64,1); }
+/* ── Dark mode: popup-config internos ── */
+body.dark #popup-config * { color: rgba(255,255,255,0.88) !important; }
+body.dark #popup-config [style*="background:#f6f8fd"],
+body.dark #popup-config [style*="background: #f6f8fd"] {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+body.dark #config-alerta-pct-input {
+  background: rgba(255,255,255,0.08) !important;
+  border-color: rgba(255,255,255,0.2) !important;
+  color: #fff !important;
+}
+body.dark #config-alerta-pct-wrap [style*="border-top"] {
+  border-top-color: rgba(255,255,255,0.12) !important;
+}
+body.dark #config-alerta-pct-wrap [style*="border-left"] {
+  border-left-color: rgba(255,255,255,0.15) !important;
+}
+/* Engrenagem e sino do popup-config no dark */
+body.dark #popup-config svg { stroke: rgba(255,255,255,0.85) !important; }
+body.dark .btn-config-salvar {
+  background: linear-gradient(135deg, #2a52b0, #4a7ed8) !important;
+  box-shadow: 0 3px 14px rgba(58,110,220,0.35) !important;
+}
+/* ── Dark mode: menu de dados ── */
+body.dark #dados-menu {
+  background: #1e3a6e !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+}
+body.dark #btn-exportar-dados,
+body.dark #btn-importar-dados {
+  color: rgba(255,255,255,0.88) !important;
+}
+body.dark #btn-exportar-dados:hover,
+body.dark #btn-importar-dados:hover {
+  background: rgba(255,255,255,0.08) !important;
+}
+body.dark #dados-menu svg {
+  stroke: rgba(255,255,255,0.75) !important;
+}
+/* ── Dark mode: popup-tour ── */
+body.dark #popup-tour * { color: rgba(255,255,255,0.88) !important; }
+body.dark #popup-tour svg { stroke: rgba(255,255,255,0.85) !important; }
+body.dark #popup-tour [style*="background:rgba(58,110,220,0.1)"],
+body.dark #popup-tour [style*="background: rgba(58,110,220,0.1)"] {
+  background: rgba(255,255,255,0.1) !important;
+}
+body.dark #popup-tour button[onclick="fecharPopupTour()"] {
+  border-color: rgba(255,255,255,0.2) !important;
+  color: rgba(255,255,255,0.7) !important;
+}
+body.dark #popup-tour button[onclick="fecharPopupTour()"]:hover {
+  background: rgba(255,255,255,0.08) !important;
+}
+body.dark .btn-iniciar-tour {
+  background: linear-gradient(135deg, #2a52b0, #4a7ed8) !important;
+  box-shadow: 0 3px 14px rgba(58,110,220,0.35) !important;
+}
+body.dark .btn-iniciar-tour:hover {
+  opacity: 0.88 !important;
+}
+.btn-iniciar-tour {
+  flex: 1;
+  background: linear-gradient(135deg, #1c3f91, #3a6edc) !important;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 0;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  color: #fff !important;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(58,110,220,0.28);
+  transition: opacity 0.15s !important;
+}
+.btn-iniciar-tour:hover {
+  opacity: 0.88 !important;
+}
+body.dark .btn-iniciar-tour:hover {
+  opacity: 0.88 !important;
+}
+body.dark .diario-vazio-icone svg { stroke: rgba(255,255,255,0.85) !important; }
+body.dark .diario-vazio-icone {
+  background: rgba(255,255,255,0.08);
+  box-shadow: none;
+}
+/* ── Dark: popup-diario calendário e inputs ── */
+body.dark #popup-diario svg { stroke: rgba(255,255,255,0.85) !important; }
+body.dark #popup-diario [style*="background:linear-gradient(135deg,rgba(28,63,145"] {
+  background: rgba(255,255,255,0.1) !important;
+}
+/* Scrollbar dos dropdowns de dia/mês */
+body.dark .popup-meta-drop-list::-webkit-scrollbar { width: 4px; }
+body.dark .popup-meta-drop-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 4px; }
+body.dark .popup-meta-drop-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 4px; }
+body.dark .popup-meta-drop-list::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.32); }
+/* Botão ativo igual ao modo claro */
+body.dark .popup-diario-entrada-btn.ativo {
+  background: linear-gradient(135deg, #2a52b0, #4a7ed8) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+/* ── Dark mode: mensagem de erro do popup diário (sobreposição de período) ── */
+body.dark #popup-diario-erro {
+  background: rgba(176, 58, 57, 0.18) !important;
+  color: #ff9b9b !important;
+  border: 1px solid rgba(176, 58, 57, 0.4);
+}
+/* ── Dark mode: barra de período encerrado ── */
+body.dark .diario-periodo-encerrado {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.45);
+}
+body.dark .diario-encerrado-sobrou {
+  color: #5ee87a;
+}
+/* ── Dark mode: botão Cancelar do popup excluir período ── */
+body.dark #popup-diario-excluir button[onclick="fecharPopupDiarioExcluir()"] {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.14) !important;
+  color: rgba(255,255,255,0.5) !important;
+}
+body.dark #popup-diario-excluir button[onclick="fecharPopupDiarioExcluir()"]:hover {
+  border-color: rgba(255,255,255,0.3) !important;
+  color: rgba(255,255,255,0.8) !important;
+}
+/* ── Dark mode: esconde ícone X do popup excluir meta (igual ao excluir período) ── */
+body.dark #popup-excluir-meta > div:first-child {
+  display: none !important;
+}
+/* ── Dark mode: tooltip de subcategoria — mais claro e visível ── */
+body.dark .subcategoria-tooltip {
+  background: linear-gradient(135deg, #4a7ed8, #7aaff0);
+  color: #ffffff;
+  border-color: rgba(255,255,255,0.35);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.55);
+}
+body.dark .subcategoria-tooltip::after {
+  background: #7aaff0;
+  border-color: rgba(255,255,255,0.35);
+}
+/* ── Dark mode: tooltip de subcategoria — tom intermediário ── */
+body.dark .subcategoria-tooltip {
+  background: linear-gradient(135deg, #2a52b0, #5a8ee0);
+  color: #ffffff;
+  border-color: rgba(255,255,255,0.28);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.55);
+}
+body.dark .subcategoria-tooltip::after {
+  background: #5a8ee0;
+  border-color: rgba(255,255,255,0.28);
+}
+/* ── Modo claro: ícone da etiqueta com stroke azul visível ── */
+#popup-subcategoria .popup-icone svg {
+  stroke: #1c3f91;
+}
+
+/* ── Dark mode: restaura stroke branco no popup subcategoria ── */
+body.dark #popup-subcategoria .popup-icone svg {
+  stroke: #ffffff;
+}

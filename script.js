@@ -247,6 +247,31 @@ function _reverterCoberturaParcial(valorMaximo) {
 
   atualizarBarraReserva();
 
+  const valorRevertido = Math.min(valorMaximo, coberto) - restante;
+
+  // Desfaz o efeito no mov_previsao_ (o saque havia feito -valor via _aplicarRetiradaBloco,
+  // então a reversão deve fazer +valorRevertido para neutralizar)
+  if (valorRevertido > 0.004) {
+    const chaveAdj = "mov_previsao_" + anoAtual + "_" + indice;
+    const adjAtual = parseFloat(localStorage.getItem(chaveAdj) || "0");
+    localStorage.setItem(chaveAdj, (adjAtual + valorRevertido).toFixed(2));
+
+    // Desfaz proporcionalmente nos blocos
+    const chaveBlocos = 'mov_previsao_blocos_' + anoAtual + '_' + indice;
+    const rawBlocos = localStorage.getItem(chaveBlocos);
+    if (rawBlocos) {
+      const blocos = JSON.parse(rawBlocos);
+      const totalRet = (blocos.retB1 || 0) + (blocos.retB2 || 0);
+      if (totalRet > 0.004) {
+        const propB1 = (blocos.retB1 || 0) / totalRet;
+        const propB2 = (blocos.retB2 || 0) / totalRet;
+        blocos.retB1 = Math.max(0, (blocos.retB1 || 0) - valorRevertido * propB1);
+        blocos.retB2 = Math.max(0, (blocos.retB2 || 0) - valorRevertido * propB2);
+        localStorage.setItem(chaveBlocos, JSON.stringify(blocos));
+      }
+    }
+  }
+
   // Atualiza cobrir_valor com o saldo líquido restante de cobertura
   const novaCobertura = Math.max(0, coberto - (Math.min(valorMaximo, coberto) - restante));
   localStorage.setItem(chaveCobertura, novaCobertura.toFixed(2));
@@ -524,6 +549,16 @@ function getLinhaBlocoIndex(linha) {
     });
   });
   return { bwIdx, lIdx };
+}
+
+function stepParcela(id, delta) {
+  const inp = document.getElementById(id);
+  if (!inp) return;
+  const min = parseInt(inp.min) || 1;
+  const max = parseInt(inp.max) || 120;
+  const val = parseInt(inp.value) || 0;
+  inp.value = Math.min(max, Math.max(min, val + delta));
+  inp.dispatchEvent(new Event('input'));
 }
 
 function abrirPopupReplicar(linha) {
@@ -894,14 +929,14 @@ const coresBancos = {
   "Picpay":         { bg: "#11C76F", color: "#fff" },
   "Bradesco":       { bg: "#CC0000", color: "#fff" },
   "Santander":      { bg: "#EC0000", color: "#fff" },
-  "C6 Bank":        { bg: "#1A1A1A", color: "#F0C020" },
+  "C6 Bank":        { bg: "#1A1A1A", color: "#F0C020", darkBg: true },
   "Inter":          { bg: "#FF6B00", color: "#fff" },
   "Caixa":          { bg: "#005CA9", color: "#fff" },
   "Banco do Brasil":{ bg: "#F8D100", color: "#003087" },
   "Mercado Pago":   { bg: "#009EE3", color: "#fff" },
   "PagBank":        { bg: "#F5A800", color: "#fff" },
   "Banco PAN":      { bg: "#034EA2", color: "#fff" },
-  "BTG Pactual":    { bg: "#1C1C1C", color: "#C9A84C" },
+  "BTG Pactual":    { bg: "#1C1C1C", color: "#C9A84C", darkBg: true },
   "Sicredi":        { bg: "#007A33", color: "#fff" },
   "Internet":       { bg: "#215a6c", color: "#fff" },
   "Água":           { bg: "#215a6c", color: "#fff" },
@@ -1108,13 +1143,29 @@ function criarSelectBanco(selectOriginal) {
   if (selectOriginal.value) clearBtn.classList.add("visible");
 }
 
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
+
 function aplicarCorBancoDisplay(display, valor) {
   const cor = coresBancos[valor];
   const clearBtn = display._clearBtn;
+  const isDark = document.body.classList.contains("dark") || document.documentElement.classList.contains("dark-early");
   if (cor) {
-    display.style.background = cor.bg;
-    display.style.color = cor.color;
-    display.style.borderColor = cor.bg;
+    if (isDark) {
+      const tintHex = cor.darkBg ? cor.color : cor.bg;
+      const rgb = hexToRgb(tintHex);
+      display.style.background = `rgba(${rgb}, 0.18)`;
+      display.style.color = cor.darkBg ? cor.color : "#fff";
+      display.style.borderColor = `rgba(${rgb}, 0.45)`;
+    } else {
+      display.style.background = cor.bg;
+      display.style.color = cor.color;
+      display.style.borderColor = cor.bg;
+    }
     display.classList.add("colored");
     // X sempre branco quando banco selecionado (fundo colorido)
     if (clearBtn) clearBtn.style.setProperty("color", "#ffffff", "important");
@@ -1469,12 +1520,16 @@ function _cobrirSelecionarBloco(bloco) {
   const b1 = document.getElementById('popup-cobrir-dest-b1');
   const b2 = document.getElementById('popup-cobrir-dest-b2');
   if (!b1 || !b2) return;
+  const isDark = document.body.classList.contains('dark');
+  const gradAtivo = isDark ? 'linear-gradient(135deg,#2a52b0,#4a7ed8)' : 'linear-gradient(135deg,#1c3f91,#3a6edc)';
+  const corInativo = isDark ? 'rgba(255,255,255,0.6)' : '#8a9cc8';
+  const bordaInativa = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(58,110,220,0.2)';
   if (bloco === 1) {
-    b1.style.background = 'linear-gradient(135deg,#1c3f91,#3a6edc)'; b1.style.color = '#fff'; b1.style.borderColor = 'transparent';
-    b2.style.background = 'none'; b2.style.color = '#8a9cc8'; b2.style.borderColor = 'rgba(58,110,220,0.2)';
+    b1.style.background = gradAtivo; b1.style.color = '#fff'; b1.style.borderColor = 'transparent';
+    b2.style.background = 'none'; b2.style.color = corInativo; b2.style.borderColor = bordaInativa;
   } else {
-    b2.style.background = 'linear-gradient(135deg,#1c3f91,#3a6edc)'; b2.style.color = '#fff'; b2.style.borderColor = 'transparent';
-    b1.style.background = 'none'; b1.style.color = '#8a9cc8'; b1.style.borderColor = 'rgba(58,110,220,0.2)';
+    b2.style.background = gradAtivo; b2.style.color = '#fff'; b2.style.borderColor = 'transparent';
+    b1.style.background = 'none'; b1.style.color = corInativo; b1.style.borderColor = bordaInativa;
   }
 }
 
@@ -1532,14 +1587,16 @@ function confirmarCobrir() {
     }
   });
 
-  // Rastreia o valor sacado como cobertura
+  // Registra em qual bloco o dinheiro da cobertura entra
+  // (para que o badge daquele bloco reflita o alívio)
+  // IMPORTANTE: cobrir_valor_ é salvo DEPOIS de _aplicarRetiradaBloco para evitar
+  // que o recalc interno ao aplicarMovimentoPrevisao reverta a cobertura prematuramente
+  _aplicarRetiradaBloco(window._cobrirBlocoDestino || 1, totalSacado);
+
+  // Rastreia o valor sacado como cobertura (salvo após _aplicarRetiradaBloco)
   const chaveCobertura = "cobrir_valor_" + anoAtual + "_" + indice;
   const cobAcum = parseFloat(localStorage.getItem(chaveCobertura) || "0");
   localStorage.setItem(chaveCobertura, (cobAcum + totalSacado).toFixed(2));
-
-  // Registra em qual bloco o dinheiro da cobertura entra
-  // (para que o badge daquele bloco reflita o alívio)
-  _aplicarRetiradaBloco(window._cobrirBlocoDestino || 1, totalSacado);
 
   recalc();
 
@@ -1872,11 +1929,19 @@ document.getElementById("ano-label").textContent = anoAtual;
   const lista = document.getElementById("ano-dropdown-list");
   anos.forEach(ano => {
     const item = document.createElement("div");
-    item.style.cssText = "padding:7px 18px;font-size:12px;font-family:inherit;cursor:pointer;background:#fff;color:#1a2a5e;text-align:center;white-space:nowrap;transition:background 0.1s,color 0.1s;";
-    if (ano === anoAtual) { item.style.background = "#e8effe"; item.style.fontWeight = "700"; item.style.color = "#1c3f91"; }
+    const dark = () => document.body.classList.contains("dark");
+    const bgNormal  = () => dark() ? "#0d1845" : "#fff";
+    const bgHover   = () => dark() ? "rgba(255,255,255,0.08)" : "#eef3fd";
+    const bgAtivo   = () => dark() ? "rgba(255,255,255,0.14)" : "#e8effe";
+    const corNormal = () => dark() ? "rgba(255,255,255,0.75)" : "#1a2a5e";
+    const corAtivo  = () => dark() ? "#fff" : "#1c3f91";
+    item.style.cssText = "padding:7px 18px;font-size:12px;font-family:inherit;cursor:pointer;text-align:center;white-space:nowrap;transition:background 0.1s,color 0.1s;";
+    item.style.background = ano === anoAtual ? bgAtivo() : bgNormal();
+    item.style.color = ano === anoAtual ? corAtivo() : corNormal();
+    if (ano === anoAtual) item.style.fontWeight = "700";
     item.textContent = ano;
-    item.addEventListener("mouseenter", () => { if (ano !== anoAtual) { item.style.background = "#eef3fd"; item.style.color = "#1c3f91"; } });
-    item.addEventListener("mouseleave", () => { if (ano !== anoAtual) { item.style.background = "#fff"; item.style.color = "#1a2a5e"; } });
+    item.addEventListener("mouseenter", () => { if (ano !== anoAtual) { item.style.background = bgHover(); item.style.color = corAtivo(); } });
+    item.addEventListener("mouseleave", () => { if (ano !== anoAtual) { item.style.background = bgNormal(); item.style.color = corNormal(); } });
     item.addEventListener("click", () => {
       if (ano === anoAtual) { fecharAnoDropdown(); return; }
       clearTimeout(_changeMonthPendente);
@@ -1909,6 +1974,15 @@ function toggleAnoDropdown() {
   const aberto = lista.style.display === "block";
   lista.style.display = aberto ? "none" : "block";
   chevron.style.transform = aberto ? "" : "rotate(180deg)";
+  // Re-aplica cores dos itens conforme o tema atual
+  if (!aberto) {
+    const dark = document.body.classList.contains("dark");
+    lista.querySelectorAll("div").forEach(item => {
+      const isAtivo = item.textContent.trim() == anoAtual;
+      item.style.background = isAtivo ? (dark ? "rgba(255,255,255,0.14)" : "#e8effe") : (dark ? "#0d1845" : "#fff");
+      item.style.color      = isAtivo ? (dark ? "#fff" : "#1c3f91") : (dark ? "rgba(255,255,255,0.75)" : "#1a2a5e");
+    });
+  }
 }
 
 function animarTroca(texto, callback) {
@@ -2539,19 +2613,26 @@ function recalc(fromSalary = false, fromUser = false){
 
   // Se há cobertura ativa e o déficit real diminuiu, reverte o excedente
   if (coberturaTotal > 0) {
-    // deficitReal já inclui o ajuste (depósitos na reserva/meta)
-    // cobertura necessária = quanto ainda falta cobrir (se déficit ainda negativo)
-    const coberturaNecessaria = Math.max(0, -deficitReal);
+    // O ajuste (mov_previsao) inclui o efeito do saque da cobertura (-coberturaTotal).
+    // Para saber o déficit real SEM a cobertura, neutralizamos esse efeito:
+    // deficitSemCobrir = totalSal - totalGastos - (ajuste + coberturaTotal)
+    // Isso representa o déficit que existia antes de qualquer saque da reserva para cobrir.
+    const deficitSemCobrir = totalSal - totalGastos - (ajuste + coberturaTotal);
+    const coberturaNecessaria = Math.max(0, -deficitSemCobrir);
     const coberturaExcedente = coberturaTotal - coberturaNecessaria;
     if (coberturaExcedente > 0.004) {
       _reverterCoberturaParcial(coberturaExcedente);
     }
   }
 
-  // coberturaTotal atualizado após possível reversão parcial acima
+  // coberturaTotal e ajuste relidos após possível reversão parcial acima
+  // (a reversão atualiza mov_previsao_ no localStorage, então precisamos reler)
   const coberturaAtual = parseFloat(localStorage.getItem(chaveCobertura) || "0");
-  const cobEfetiva = deficitReal < 0 ? Math.min(coberturaAtual, Math.abs(deficitReal)) : 0;
-  const previsaoSaldo = deficitReal + cobEfetiva;
+  const ajusteAtual = parseFloat(localStorage.getItem(chaveAdj) || "0");
+  const deficitFinal = totalSal - totalGastos - ajusteAtual;
+  const deficitOriginal = totalSal - totalGastos - (ajusteAtual + coberturaAtual);
+  const cobEfetiva = (coberturaAtual > 0 && deficitFinal < 0 && coberturaAtual >= Math.abs(deficitOriginal)) ? Math.abs(deficitOriginal) : 0;
+  const previsaoSaldo = deficitFinal + cobEfetiva;
   _previsaoSaldoCache = previsaoSaldo; // atualiza cache para uso do Diário
   const gastoPct = totalSal > 0 ? (totalGastos / totalSal) * 100 : 0;
   // previsaoPct é puramente (salário - gastos) / salário — não inclui ajuste de reserva/meta nem cobertura
@@ -2698,6 +2779,7 @@ function atualizarDisplayReserva() {
     : 0;
   el.textContent = brl(saldo);
   el.style.color = saldo > 0 ? "#1f7a1f" : "#1a2a5e";
+  el.classList.toggle("verde", saldo > 0);
 }
 
 /* ── 16. POPUP MOVIMENTO (DEPOSITAR / RETIRAR) ──────────────────────────
@@ -2790,8 +2872,13 @@ function exibirToastSaldo(msg, duracao) {
     </div>
     <button class="toast-fechar" onclick="_fecharToast(this.closest('.toast-sistema'))">×</button>
     <div class="toast-bar-sistema"></div>`;
-  toast.style.cssText = "position:fixed;right:20px;z-index:10002;background:#fff;border-radius:10px;" +
-    "box-shadow:0 4px 20px rgba(0,0,0,0.18),0 0 0 1px rgba(231,76,60,0.15);" +
+  const _isDark = document.body.classList.contains('dark');
+  const _toastBg = _isDark ? '#1e3a6e' : '#fff';
+  const _toastShadow = _isDark
+    ? '0 4px 20px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.08)'
+    : '0 4px 20px rgba(0,0,0,0.18),0 0 0 1px rgba(231,76,60,0.15)';
+  toast.style.cssText = "position:fixed;right:20px;z-index:10002;background:" + _toastBg + ";border-radius:10px;" +
+    "box-shadow:" + _toastShadow + ";" +
     "padding:12px 16px 10px;display:flex;align-items:flex-start;gap:10px;" +
     "width:320px;max-width:calc(100vw - 40px);opacity:0;overflow:hidden;" +
     "transform:translateX(110%);transition:opacity 0.3s ease,transform 0.3s cubic-bezier(0.34,1.2,0.64,1);";
@@ -4266,8 +4353,16 @@ function _inicializarIconePrevisao() {
   const tooltip = document.getElementById("previsao-pct-tooltip");
   if (!icone || !tooltip) return;
 
-  // Popula o SVG do ícone
-  icone.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8a9cc8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8" stroke-width="3"/><line x1="12" y1="12" x2="12" y2="16"/></svg>';
+  // Insere o SVG do ícone sem apagar o tooltip já existente
+  if (!icone.querySelector("svg")) {
+    const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svgEl.setAttribute("width", "11"); svgEl.setAttribute("height", "11");
+    svgEl.setAttribute("viewBox", "0 0 24 24"); svgEl.setAttribute("fill", "none");
+    svgEl.setAttribute("stroke", "#8a9cc8"); svgEl.setAttribute("stroke-width", "2.2");
+    svgEl.setAttribute("stroke-linecap", "round"); svgEl.setAttribute("stroke-linejoin", "round");
+    svgEl.innerHTML = '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8" stroke-width="3"/><line x1="12" y1="12" x2="12" y2="16"/>';
+    icone.insertBefore(svgEl, icone.firstChild);
+  }
 
   // Hover com delay — JS fallback para :has() em browsers antigos
   let _timerIn, _timerOut;
@@ -4276,7 +4371,7 @@ function _inicializarIconePrevisao() {
     _timerIn = setTimeout(() => {
       tooltip.style.opacity = "1";
       tooltip.style.visibility = "visible";
-    }, 500);
+    }, 0);
   });
   icone.addEventListener("mouseleave", () => {
     clearTimeout(_timerIn);
@@ -4858,7 +4953,7 @@ function _diarioAtualizarInfoEntrada() {
     infoEl.style.color = '#c0392b';
   } else {
     infoEl.textContent = 'Disponível: ' + brl(livre);
-    infoEl.style.color = '#2e7d32';
+    infoEl.style.color = document.body.classList.contains('dark') ? '#5ee87a' : '#2e7d32';
   }
 }
 
@@ -5423,7 +5518,7 @@ function _sincronizarToggle() {
     toggleCor.style.pointerEvents = _alertaPrevisaoAtivo ? "auto" : "none";
   }
   if (thumbCor) {
-    thumbCor.style.left = (_alertaPrevisaoAtivo && _alertaCorAtivo) ? "24px" : "4px";
+    thumbCor.style.left = (_alertaPrevisaoAtivo && _alertaCorAtivo) ? "19px" : "3px";
   }
 
   // Só atualiza o input se o usuário não tiver digitado nada diferente
@@ -5590,7 +5685,7 @@ function _aplicarEstadoMesFechado() {
     btnFch.classList.toggle("mes-fechado", fechado);
     const tooltip = btnFch.querySelector(".btn-replicar-mes-tooltip");
     if (tooltip) tooltip.textContent = fechado ? "Reabrir fechamento contábil" : "Fechamento contábil";
-    btnFch.title = fechado ? "Reabrir fechamento contábil" : "Fechamento contábil";
+    btnFch.removeAttribute("title");
     // Redireciona clique conforme estado
     btnFch.onclick = fechado ? abrirPopupReabrirMes : abrirPopupFecharMes;
   }
@@ -6371,7 +6466,7 @@ function _exibirPassoTourDiario(i) {
     const psair = _tourPassosDiario[_tourDiarioUltimo];
     if (psair && psair.onSair) psair.onSair.call(psair);
     // Se estava num passo com popup (1,2,3) e vai para fora desse range, fecha o popup
-    const _passoComPopup = [1, 2, 3];
+    const _passoComPopup = [1, 2, 3, 4];
     if (_passoComPopup.includes(_tourDiarioUltimo) && !_passoComPopup.includes(i)) {
       // Restaura o infoEl e fecha popup apenas ao sair completamente do range 1-3
       const infoEl2 = document.getElementById('popup-diario-entrada-info');
@@ -7043,16 +7138,18 @@ function _renderizarSimulador() {
     const d = dados[i] || { entrada: 0, saida: 0 };
     const tr = document.createElement('tr');
     tr.style.transition = 'background 0.12s';
-    tr.onmouseover = () => tr.style.background = '#f5f8fd';
+    tr.onmouseover = () => tr.style.background = '';
     tr.onmouseout  = () => tr.style.background = '';
+    tr.className = 'sim-row';
 
     const tdMes = document.createElement('td');
     tdMes.textContent = mes;
-    tdMes.style.cssText = 'padding:6px 0;color:#1a2a5e;font-weight:600;font-size:12px;text-align:center;';
+    tdMes.className = 'sim-cel-mes';
+    tdMes.style.cssText = 'padding:6px 0;font-weight:600;font-size:12px;text-align:center;';
 
     const tdInicial = document.createElement('td');
     tdInicial.className = 'sim-cel-inicial';
-    tdInicial.style.cssText = 'padding:6px 0;text-align:center;color:#6a7aaa;font-weight:600;font-size:12px;';
+    tdInicial.style.cssText = 'padding:6px 0;text-align:center;font-weight:600;font-size:12px;';
     tdInicial.textContent = 'R$ 0,00';
 
     const tdEntrada = criarCelula('entrada', i, d.entrada);
@@ -9038,3 +9135,45 @@ function _fecharDadosMenuExterno(e) {
   if (menu && menu.contains(e.target)) return;
   fecharDadosMenu();
 }
+/* ══════════════════════════════════════════════════════════════════
+   MODO NOTURNO
+   ══════════════════════════════════════════════════════════════════ */
+function toggleDarkMode() {
+  // Desabilita transitions para tudo mudar simultaneamente
+  const noTrans = document.createElement('style');
+  noTrans.id = '_dark-notransition';
+  noTrans.textContent = '*, *::before, *::after { transition: none !important; }';
+  document.head.appendChild(noTrans);
+
+  const isDark = document.body.classList.toggle("dark");
+  localStorage.setItem("planova_dark_mode", isDark ? "1" : "0");
+  _syncIconesDark(isDark);
+  // Re-aplica cores de todos os bancos já renderizados
+  sincronizarDropdownsBancos();
+
+  // Reativa transitions após o browser pintar o novo estado
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      const el = document.getElementById('_dark-notransition');
+      if (el) el.remove();
+    });
+  });
+}
+
+function _syncIconesDark(isDark) {
+  const tip = document.querySelector("#btn-dark-mode .fab-tooltip");
+  if (tip) tip.textContent = isDark ? "Modo claro" : "Modo noturno";
+  // Visual do toggle é controlado via CSS com body.dark
+}
+
+/* Aplica preferência salva ao carregar */
+(function() {
+  if (localStorage.getItem("planova_dark_mode") === "1") {
+    document.body.classList.add("dark");
+    const apply = () => {
+      if (document.getElementById("dark-icon-lua")) _syncIconesDark(true);
+      else requestAnimationFrame(apply);
+    };
+    requestAnimationFrame(apply);
+  }
+})();
