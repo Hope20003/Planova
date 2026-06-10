@@ -923,6 +923,582 @@ function resolverConflito(modo) {
  *  Categorias de residência (Internet, Água etc.) = azul-petróleo #215a6c.
  * ────────────────────────────────────────────────────────────────────── */
 /* ── CORES DOS BANCOS NOS SELECTS DE CARTÃO ── */
+
+/* ══════════════════════════════════════════════════════════════════════
+ *  CATEGORIAS PERSONALIZADAS
+ *  - Tipo 'residencia': aparece nos blocos res (bloco1-res, bloco2-res)
+ *  - Tipo 'cartoes': aparece nos blocos cart (bloco1-cart, bloco2-cart)
+ *  - Tipo 'outros': aparece nos blocos emp (bloco1-emp, bloco2-emp)
+ *  - Máximo 5 por tipo (15 no total)
+ *  - Salvo em localStorage 'categorias_personalizadas' e exportado no JSON
+ * ══════════════════════════════════════════════════════════════════════ */
+
+const CAT_MAX = 5;
+const CAT_LS_KEY = 'categorias_personalizadas';
+
+function _catCarregar() {
+  try {
+    const dados = JSON.parse(localStorage.getItem(CAT_LS_KEY) || '{}');
+    if (!Array.isArray(dados.residencia)) dados.residencia = [];
+    // Migração: versões antigas usavam 'geral' para cartões+outros → move para 'cartoes'
+    if (!Array.isArray(dados.cartoes)) dados.cartoes = Array.isArray(dados.geral) ? dados.geral : [];
+    if (!Array.isArray(dados.outros))  dados.outros  = [];
+    delete dados.geral;
+    return dados;
+  }
+  catch(e) { return { residencia: [], cartoes: [], outros: [] }; }
+}
+function _catSalvar(dados) {
+  localStorage.setItem(CAT_LS_KEY, JSON.stringify(dados));
+}
+
+// Retorna o tipo com base no bloco-wrap mais próximo de um select
+function _catTipoPorBloco(blocoTitulo) {
+  if (blocoTitulo.includes('resid')) return 'residencia';
+  if (blocoTitulo.includes('cart'))  return 'cartoes';
+  return 'outros';
+}
+
+// Mescla categorias personalizadas no coresBancos e nas listas de opções
+function _catAplicar() {
+  const dados = _catCarregar();
+
+  // Remove entradas personalizadas antigas antes de re-adicionar
+  Object.keys(coresBancos).forEach(k => { if (coresBancos[k]._custom) delete coresBancos[k]; });
+
+  // Remove itens personalizados das listas (trunca ao tamanho padrão)
+  while (bancosResidencia.length > _CAT_RES_PADRAO)    bancosResidencia.pop();
+  while (bancosCartao.length     > _CAT_CART_PADRAO)   bancosCartao.pop();
+  while (bancosOutros.length     > _CAT_OUTROS_PADRAO) bancosOutros.pop();
+
+  dados.residencia.forEach(cat => {
+    coresBancos[cat.nome] = { bg: cat.bg, color: cat.color, _custom: true };
+    if (!bancosResidencia.includes(cat.nome)) bancosResidencia.push(cat.nome);
+  });
+  dados.cartoes.forEach(cat => {
+    coresBancos[cat.nome] = { bg: cat.bg, color: cat.color, _custom: true };
+    if (!bancosCartao.includes(cat.nome)) bancosCartao.push(cat.nome);
+  });
+  dados.outros.forEach(cat => {
+    coresBancos[cat.nome] = { bg: cat.bg, color: cat.color, _custom: true };
+    if (!bancosOutros.includes(cat.nome)) bancosOutros.push(cat.nome);
+  });
+
+  // Injeta <option> nos selects nativos para que sel.value funcione ao restaurar o mes
+  document.querySelectorAll(".bloco-wrap").forEach(bw => {
+    const titulo = bw.querySelector("h3")?.textContent.trim().toLowerCase() || "";
+    const tipo = _catTipoPorBloco(titulo);
+    const cats = dados[tipo] || [];
+    bw.querySelectorAll("select").forEach(sel => {
+      sel.querySelectorAll("option[data-custom]").forEach(o => o.remove());
+      cats.forEach(cat => {
+        if (!sel.querySelector('option[value="' + cat.nome + '"]')) {
+          const opt = document.createElement("option");
+          opt.value = cat.nome;
+          opt.textContent = cat.nome;
+          opt.setAttribute("data-custom", "1");
+          sel.appendChild(opt);
+        }
+      });
+    });
+  });
+}
+
+// Reconstrói os itens do dropdown após adicionar categoria
+function _catAtualizarDropdowns(tipo) {
+  document.querySelectorAll('.bloco-wrap').forEach(bw => {
+    const titulo = bw.querySelector('h3')?.textContent.trim().toLowerCase() || '';
+    const tipoBloco = _catTipoPorBloco(titulo);
+    if (tipoBloco !== tipo) return;
+    bw.querySelectorAll('select').forEach(sel => {
+      const display = sel._customDisplay;
+      if (!display) return;
+      const list = display._list;
+      if (!list) return;
+      // Remove itens antigos (mantém search)
+      list.querySelectorAll('.select-banco-item').forEach(i => i.remove());
+      const lista = tipo === 'residencia' ? bancosResidencia : tipo === 'cartoes' ? bancosCartao : bancosOutros;
+      lista.forEach(banco => {
+        if (banco === 'Selecione') return;
+        const item = document.createElement('div');
+        item.className = 'select-banco-item';
+        item.textContent = banco;
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          sel.value = banco;
+          display.textContent = banco;
+          display.appendChild(display._clearBtn);
+          aplicarCorBancoDisplay(display, banco);
+          atualizarDisplayVazio(display, banco);
+          display._clearBtn.classList.add('visible');
+          list.classList.remove('open');
+          const linha = sel.closest('.linha');
+          if (linha) {
+            const btnSub = linha.querySelector('.btn-subcategoria-linha');
+            if (btnSub) atualizarTooltipSubcategoria(btnSub, linha);
+          }
+          recalc();
+        });
+        list.appendChild(item);
+      });
+      // Adiciona botão lápis ao final da lista
+      _catInjetarLapis(list, tipo);
+    });
+  });
+}
+
+// Injeta o botão lápis no final da lista dropdown
+function _catInjetarLapis(list, tipo) {
+  list.querySelectorAll('.select-banco-editar-cat').forEach(e => e.remove());
+  const footer = document.createElement('div');
+  footer.className = 'select-banco-editar-cat';
+  const btn = document.createElement('button');
+  btn.className = 'select-banco-lapis-btn';
+  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><span class="lapis-tooltip">Editar categorias</span>';
+  btn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    list.classList.remove('open');
+    abrirPopupCategorias(tipo);
+  });
+  footer.appendChild(btn);
+  list.appendChild(footer);
+}
+
+/* ── Popup de gerenciar categorias ── */
+let _catTipoAtual = 'residencia';
+let _catEditandoIdx = -1; // -1 = novo
+
+function abrirPopupCategorias(tipo) {
+  _catTipoAtual = tipo;
+  _catEditandoIdx = -1;
+  const overlay = document.getElementById('popup-categorias-overlay');
+  const popup   = document.getElementById('popup-categorias');
+  const subtitulos = { residencia: 'Residência', cartoes: 'Cartões', outros: 'Outros' };
+  document.getElementById('popup-cat-subtitulo').textContent = subtitulos[tipo] || tipo;
+  overlay.style.display = 'block';
+  popup.style.display   = 'block';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    popup.style.opacity       = '1';
+    popup.style.transform     = 'translate(-50%,-50%) scale(1)';
+    popup.style.pointerEvents = 'auto';
+  }));
+  _catRenderizarLista();
+  fecharFormCategoria();
+}
+
+function fecharPopupCategorias() {
+  const overlay = document.getElementById('popup-categorias-overlay');
+  const popup   = document.getElementById('popup-categorias');
+  popup.style.opacity       = '0';
+  popup.style.transform     = 'translate(-50%,-50%) scale(0.94)';
+  popup.style.pointerEvents = 'none';
+  setTimeout(() => {
+    popup.style.display   = 'none';
+    overlay.style.display = 'none';
+  }, 200);
+}
+
+function _catRenderizarLista() {
+  const dados = _catCarregar();
+  const lista = dados[_catTipoAtual] || [];
+  const el    = document.getElementById('popup-cat-lista');
+  // Remove tooltips fixos antigos criados por esta função
+  document.querySelectorAll('.cat-row-tip-fixed').forEach(t => t.remove());
+  el.innerHTML = '';
+
+  if (lista.length === 0) {
+    el.innerHTML = '<div class="popup-cat-vazio">Nenhuma categoria cadastrada ainda.</div>';
+  } else {
+    lista.forEach((cat, idx) => {
+      const row = document.createElement('div');
+      row.className = 'popup-cat-row';
+
+      const badge = document.createElement('div');
+      badge.className = 'popup-cat-badge';
+      badge.style.background = cat.bg;
+      badge.style.color = cat.color;
+      badge.textContent = cat.nome;
+
+      const btns = document.createElement('div');
+      btns.className = 'popup-cat-row-btns';
+
+      // Helper: cria botão com tooltip fixed no body
+      function _criarBtnComTip(classes, svgHtml, tipText, tipClasses, onClickFn) {
+        const btn = document.createElement('button');
+        btn.className = classes;
+        btn.innerHTML = svgHtml;
+        btn.onclick = onClickFn;
+
+        const tip = document.createElement('div');
+        tip.className = 'lapis-tip-fixed' + (tipClasses ? ' ' + tipClasses : '');
+        tip.textContent = tipText;
+        document.body.appendChild(tip);
+
+        btn.addEventListener('mouseenter', () => {
+          const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+          const r = btn.getBoundingClientRect();
+          tip.style.left   = (r.left / zoom + r.width / zoom / 2) + 'px';
+          tip.style.top    = 'auto';
+          tip.style.bottom = (window.innerHeight / zoom - r.top / zoom + 6) + 'px';
+          tip.classList.add('visible');
+        });
+        btn.addEventListener('mouseleave', () => tip.classList.remove('visible'));
+        btn.addEventListener('mousedown',  () => tip.classList.remove('visible'));
+        // Marca para limpeza na próxima renderização
+        tip.classList.add('cat-row-tip-fixed');
+        return btn;
+      }
+
+      const btnEditar = _criarBtnComTip(
+        'popup-cat-row-btn',
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+        'Editar', '',
+        () => editarCategoria(idx)
+      );
+      const btnExcluir = _criarBtnComTip(
+        'popup-cat-row-btn excluir',
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>',
+        'Excluir', 'cat-row-tip-excluir',
+        () => excluirCategoria(idx)
+      );
+
+      btns.appendChild(btnEditar);
+      btns.appendChild(btnExcluir);
+      row.appendChild(badge);
+      row.appendChild(btns);
+      el.appendChild(row);
+    });
+  }
+
+  const btnAdd = document.getElementById('popup-cat-btn-add');
+  btnAdd.style.display = lista.length >= CAT_MAX ? 'none' : 'block';
+  if (lista.length >= CAT_MAX) {
+    if (!el.querySelector('.popup-cat-limite')) {
+      const lim = document.createElement('div');
+      lim.className = 'popup-cat-limite';
+      lim.textContent = `Limite de ${CAT_MAX} categorias atingido.`;
+      el.appendChild(lim);
+    }
+  }
+}
+
+function abrirFormCategoria(idx) {
+  _catEditandoIdx = idx !== undefined ? idx : -1;
+  const form = document.getElementById('popup-cat-form');
+  const btnAdd = document.getElementById('popup-cat-btn-add');
+  form.style.display = 'block';
+  btnAdd.style.display = 'none';
+  // Esconde header e lista enquanto form está aberto
+  const headerEl = document.querySelector('#popup-categorias .popup-cat-header');
+  if (headerEl) headerEl.style.display = 'none';
+  const listaEl = document.getElementById('popup-cat-lista');
+  if (listaEl) listaEl.style.display = 'none';
+
+  if (_catEditandoIdx >= 0) {
+    const dados = _catCarregar();
+    const cat   = dados[_catTipoAtual][_catEditandoIdx];
+    document.getElementById('popup-cat-form-titulo').textContent = 'Editar categoria';
+    document.getElementById('popup-cat-nome').value     = cat.nome;
+    document.getElementById('popup-cat-cor-bg').value   = cat.bg;
+    document.getElementById('popup-cat-cor-text').value = cat.color;
+    const swBg   = document.getElementById('swatch-bg');
+    const swText = document.getElementById('swatch-text');
+    if (swBg)   swBg.style.background   = cat.bg;
+    if (swText) swText.style.background = cat.color;
+  } else {
+    document.getElementById('popup-cat-form-titulo').textContent = 'Nova categoria';
+    document.getElementById('popup-cat-nome').value     = '';
+    document.getElementById('popup-cat-cor-bg').value   = '#215a6c';
+    document.getElementById('popup-cat-cor-text').value = '#ffffff';
+    const swBg   = document.getElementById('swatch-bg');
+    const swText = document.getElementById('swatch-text');
+    if (swBg)   swBg.style.background   = '#215a6c';
+    if (swText) swText.style.background = '#ffffff';
+  }
+  _catAtualizarPreview();
+  document.getElementById('popup-cat-nome').focus();
+}
+
+function editarCategoria(idx) { abrirFormCategoria(idx); }
+
+function fecharFormCategoria() {
+  const form = document.getElementById('popup-cat-form');
+  if (form) form.style.display = 'none';
+  if (typeof fecharCatPicker === 'function') fecharCatPicker();
+  // Restaura header e lista
+  const headerEl = document.querySelector('#popup-categorias .popup-cat-header');
+  if (headerEl) headerEl.style.display = '';
+  const listaEl = document.getElementById('popup-cat-lista');
+  if (listaEl) listaEl.style.display = '';
+  const dados = _catCarregar();
+  const lista = dados[_catTipoAtual] || [];
+  const btnAdd = document.getElementById('popup-cat-btn-add');
+  if (btnAdd) btnAdd.style.display = lista.length >= CAT_MAX ? 'none' : 'block';
+}
+
+// ── COLOR PICKER CUSTOMIZADO ──────────────────────────────────
+(function() {
+  let _cpAlvo = 'bg'; // 'bg' ou 'text'
+  let _cpHue = 180;
+  let _cpSatPct = 0.5;
+  let _cpLightPct = 0.5;
+  let _cpDragging = false;
+
+  function _hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return '#' + [f(0), f(8), f(4)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
+  }
+
+  function _hexToHsv(hex) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    const r = parseInt(hex.slice(0,2),16)/255, g = parseInt(hex.slice(2,4),16)/255, b = parseInt(hex.slice(4,6),16)/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+    let h = 0;
+    if (d !== 0) {
+      if (max === r) h = ((g - b) / d) % 6;
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h = Math.round(h * 60); if (h < 0) h += 360;
+    }
+    const s = max === 0 ? 0 : d / max;
+    const v = max;
+    return { h, s, v };
+  }
+
+  function _hsvToHex(h, s, v) {
+    const f = (n, k = (n + h / 60) % 6) => v - v * s * Math.max(Math.min(k, 4 - k, 1), 0);
+    return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2,'0')).join('');
+  }
+
+  function _drawCanvas() {
+    const canvas = document.getElementById('cat-cp-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    // Gradiente de saturação (branco → cor pura)
+    const gS = ctx.createLinearGradient(0, 0, W, 0);
+    gS.addColorStop(0, '#fff');
+    gS.addColorStop(1, `hsl(${_cpHue},100%,50%)`);
+    ctx.fillStyle = gS; ctx.fillRect(0, 0, W, H);
+    // Gradiente de valor (transparente → preto)
+    const gV = ctx.createLinearGradient(0, 0, 0, H);
+    gV.addColorStop(0, 'rgba(0,0,0,0)');
+    gV.addColorStop(1, '#000');
+    ctx.fillStyle = gV; ctx.fillRect(0, 0, W, H);
+    // Cursor
+    const cx = _cpSatPct * W, cy = (1 - _cpLightPct) * H;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 8, 0, 2 * Math.PI);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, 2 * Math.PI);
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  function _applyColor(hex) {
+    const input  = document.getElementById('popup-cat-cor-' + _cpAlvo);
+    const swatch = document.getElementById('swatch-' + _cpAlvo);
+    if (input)  input.value = hex;
+    if (swatch) swatch.style.background = hex;
+    _catAtualizarPreview();
+  }
+
+  function _updateFromHsv() {
+    const hex = _hsvToHex(_cpHue, _cpSatPct, _cpLightPct);
+    const sp = document.getElementById('cat-cp-swatch-preview');
+    const hx = document.getElementById('cat-cp-hex');
+    if (sp) sp.style.background = hex;
+    if (hx) hx.value = hex.toUpperCase();
+    _applyColor(hex);
+    _drawCanvas();
+  }
+
+  function _pickFromCanvas(e) {
+    const canvas = document.getElementById('cat-cp-canvas');
+    const r = canvas.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - r.left, r.width));
+    const y = Math.max(0, Math.min(e.clientY - r.top, r.height));
+    _cpSatPct   = x / r.width;
+    _cpLightPct = 1 - y / r.height;
+    _updateFromHsv();
+  }
+
+  window.abrirCatPicker = function(alvo) {
+    _cpAlvo = alvo;
+    const hex = document.getElementById('popup-cat-cor-' + alvo).value;
+    const hsv = _hexToHsv(hex);
+    _cpHue       = hsv.h;
+    _cpSatPct    = hsv.s;
+    _cpLightPct  = hsv.v;
+
+    // Posição — próximo ao swatch clicado
+    const swatch  = document.getElementById('swatch-' + alvo);
+    const picker  = document.getElementById('cat-color-picker');
+    const overlay = document.getElementById('cat-color-picker-overlay');
+    picker.style.display  = 'block';
+    overlay.style.display = 'block';
+
+    const sr = swatch.getBoundingClientRect();
+    let top = sr.bottom + 8, left = sr.left - 100;
+    left = Math.max(8, Math.min(left, window.innerWidth - 280));
+    top  = Math.min(top, window.innerHeight - 320);
+    picker.style.top  = top  + 'px';
+    picker.style.left = left + 'px';
+
+    const hueInput = document.getElementById('cat-cp-hue');
+    if (hueInput) hueInput.value = _cpHue;
+    _updateFromHsv();
+  };
+
+  window.fecharCatPicker = function() {
+    document.getElementById('cat-color-picker').style.display  = 'none';
+    document.getElementById('cat-color-picker-overlay').style.display = 'none';
+  };
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const canvas = document.getElementById('cat-cp-canvas');
+    if (!canvas) return;
+
+    // Hue slider
+    document.getElementById('cat-cp-hue').addEventListener('input', function() {
+      _cpHue = +this.value;
+      _updateFromHsv();
+    });
+
+    // Hex input
+    document.getElementById('cat-cp-hex').addEventListener('input', function() {
+      const v = this.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+        const hsv = _hexToHsv(v);
+        _cpHue = hsv.h; _cpSatPct = hsv.s; _cpLightPct = hsv.v;
+        document.getElementById('cat-cp-hue').value = _cpHue;
+        document.getElementById('cat-cp-swatch-preview').style.background = v;
+        _applyColor(v);
+        _drawCanvas();
+      }
+    });
+
+    // Canvas drag
+    canvas.addEventListener('mousedown', function(e) { _cpDragging = true; _pickFromCanvas(e); });
+    document.addEventListener('mousemove', function(e) { if (_cpDragging) _pickFromCanvas(e); });
+    document.addEventListener('mouseup', function() { _cpDragging = false; });
+
+    // Touch
+    canvas.addEventListener('touchstart', function(e) { _cpDragging = true; _pickFromCanvas(e.touches[0]); e.preventDefault(); }, {passive:false});
+    document.addEventListener('touchmove', function(e) { if (_cpDragging) _pickFromCanvas(e.touches[0]); }, {passive:false});
+    document.addEventListener('touchend',  function() { _cpDragging = false; });
+
+    // Inicializar swatches com cores padrão
+    const swBg   = document.getElementById('swatch-bg');
+    const swText = document.getElementById('swatch-text');
+    if (swBg)   swBg.style.background   = '#215a6c';
+    if (swText) swText.style.background = '#ffffff';
+  });
+})();
+
+// Event listeners para preview (inicializado uma vez no DOMContentLoaded)
+document.addEventListener('DOMContentLoaded', function() {
+  ['popup-cat-nome','popup-cat-cor-bg','popup-cat-cor-text'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', _catAtualizarPreview);
+  });
+});
+
+function _catAtualizarPreview() {
+  const nome  = document.getElementById('popup-cat-nome').value.trim() || 'Nome';
+  const bg    = document.getElementById('popup-cat-cor-bg').value;
+  const color = document.getElementById('popup-cat-cor-text').value;
+  const prev  = document.getElementById('popup-cat-preview');
+  prev.textContent       = nome;
+  prev.style.background  = bg;
+  prev.style.color       = color;
+}
+
+function salvarCategoria() {
+  const nome  = document.getElementById('popup-cat-nome').value.trim();
+  const bg    = document.getElementById('popup-cat-cor-bg').value;
+  const color = document.getElementById('popup-cat-cor-text').value;
+  if (!nome) { document.getElementById('popup-cat-nome').focus(); return; }
+
+  const dados = _catCarregar();
+  if (!Array.isArray(dados[_catTipoAtual])) dados[_catTipoAtual] = [];
+  const lista = dados[_catTipoAtual];
+
+  // Verifica duplicata (exceto ao editar o mesmo)
+  const dupIdx = lista.findIndex((c, i) => c.nome.toLowerCase() === nome.toLowerCase() && i !== _catEditandoIdx);
+  if (dupIdx >= 0) {
+    document.getElementById('popup-cat-nome').classList.add('popup-cat-input-erro');
+    setTimeout(() => document.getElementById('popup-cat-nome').classList.remove('popup-cat-input-erro'), 1200);
+    return;
+  }
+
+  if (_catEditandoIdx >= 0) {
+    const nomeAntigo = lista[_catEditandoIdx].nome;
+    lista[_catEditandoIdx] = { nome, bg, color };
+    // Atualiza dropdowns que tinham o nome antigo selecionado
+    if (nomeAntigo !== nome) {
+      document.querySelectorAll('select').forEach(sel => {
+        if (sel.value === nomeAntigo) {
+          sel.value = nome;
+          if (sel._customDisplay) aplicarCorBancoDisplay(sel._customDisplay, nome);
+        }
+      });
+    } else {
+      // Só cor mudou — re-aplica
+      document.querySelectorAll('select').forEach(sel => {
+        if (sel.value === nome && sel._customDisplay) aplicarCorBancoDisplay(sel._customDisplay, nome);
+      });
+    }
+  } else {
+    if (lista.length >= CAT_MAX) return;
+    lista.push({ nome, bg, color });
+  }
+
+  _catSalvar(dados);
+  _catAplicar();
+  _catAtualizarDropdowns(_catTipoAtual);
+  fecharFormCategoria();
+  _catRenderizarLista();
+}
+
+function excluirCategoria(idx) {
+  const dados = _catCarregar();
+  if (!Array.isArray(dados[_catTipoAtual])) return;
+  const nome  = dados[_catTipoAtual][idx]?.nome;
+  dados[_catTipoAtual].splice(idx, 1);
+  _catSalvar(dados);
+  // Limpa dropdowns que usavam essa categoria
+  if (nome) {
+    document.querySelectorAll('select').forEach(sel => {
+      if (sel.value === nome) {
+        sel.value = '';
+        if (sel._customDisplay) {
+          sel._customDisplay.textContent = 'Selecione';
+          if (sel._customDisplay._clearBtn) {
+            sel._customDisplay.appendChild(sel._customDisplay._clearBtn);
+            sel._customDisplay._clearBtn.classList.remove('visible');
+          }
+          aplicarCorBancoDisplay(sel._customDisplay, '');
+        }
+      }
+    });
+    delete coresBancos[nome];
+  }
+  _catAplicar();
+  _catAtualizarDropdowns(_catTipoAtual);
+  fecharFormCategoria();
+  _catRenderizarLista();
+}
+
 const coresBancos = {
   "Nubank":         { bg: "#8A05BE", color: "#fff" },
   "Itaú":           { bg: "#EC7000", color: "#fff" },
@@ -951,11 +1527,12 @@ const coresBancos = {
 
 
 function inicializarCoresBancos() {
+  _catAplicar(); // Mescla categorias personalizadas antes de criar os dropdowns
   document.querySelectorAll(".bloco-wrap").forEach(bw => {
     const titulo = bw.querySelector("h3");
     if (!titulo) return;
-    const isCartao = titulo.textContent.trim().toLowerCase().includes("cart");
-    if (!isCartao) return;
+    const txt = titulo.textContent.trim().toLowerCase();
+    if (!txt.includes("cart") && !txt.includes("outr") && !txt.includes("resid")) return;
     bw.querySelectorAll("select").forEach(sel => {
       aplicarCorBanco(sel);
       sel.addEventListener("change", () => aplicarCorBanco(sel));
@@ -982,6 +1559,11 @@ function inicializarCoresBancos() {
 /* ── DROPDOWN CUSTOMIZADO BANCOS ── */
 const bancosResidencia = ["Selecione","Internet","Água","Energia","Aluguel","Financiamento","Condomínio","IPTU"];
 const bancosCartao = ["Selecione","Banco do Brasil","Banco PAN","Bradesco","BTG Pactual","C6 Bank","Caixa","Inter","Itaú","Mercado Pago","Nubank","Original","PagBank","Picpay","Santander","Sicredi"];
+const bancosOutros  = ["Selecione","Banco do Brasil","Banco PAN","Bradesco","BTG Pactual","C6 Bank","Caixa","Inter","Itaú","Mercado Pago","Nubank","Original","PagBank","Picpay","Santander","Sicredi"];
+// Tamanhos fixos das listas padrão — sentinels para limpeza em _catAplicar
+const _CAT_RES_PADRAO    = 8;   // Selecione + 7 itens
+const _CAT_CART_PADRAO   = 16;  // Selecione + 15 bancos
+const _CAT_OUTROS_PADRAO = 16;  // Selecione + 15 bancos
 
 function atualizarDisplayVazio(display, valor) {
   display.classList.toggle("vazio", !valor);
@@ -1030,7 +1612,8 @@ function criarSelectBanco(selectOriginal) {
   list.className = "select-banco-list";
 
   const blocoTitulo = selectOriginal.closest(".bloco-wrap")?.querySelector("h3")?.textContent.trim().toLowerCase() || "";
-  const listaOpcoes = blocoTitulo.includes("resid") ? bancosResidencia : bancosCartao;
+  const _tipoBlocoSel = _catTipoPorBloco(blocoTitulo);
+  const listaOpcoes = _tipoBlocoSel === 'residencia' ? bancosResidencia : _tipoBlocoSel === 'cartoes' ? bancosCartao : bancosOutros;
 
   listaOpcoes.forEach(banco => {
     if (banco === "Selecione") return;
@@ -1083,6 +1666,9 @@ function criarSelectBanco(selectOriginal) {
 
   // Mover a list para o body para escapar de qualquer overflow:hidden
   document.body.appendChild(list);
+  // Injeta botão lápis (será recriado com o tipo correto)
+  const _tipoBlocoLapis = _tipoBlocoSel;
+  _catInjetarLapis(list, _tipoBlocoLapis);
 
   display.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -1177,13 +1763,14 @@ function aplicarCorBancoDisplay(display, valor) {
     if (!valor) {
       display.childNodes.forEach(n => { if (n !== clearBtn) n.remove(); });
       display.insertBefore(document.createTextNode("Selecione"), display.firstChild);
+      if (clearBtn) clearBtn.style.color = "";
     }
-    if (clearBtn) clearBtn.style.color = "#cc0000";
     atualizarDisplayVazio(display, valor);
   }
 }
 
 function inicializarCoresBancos() {
+  _catAplicar(); // Mescla categorias personalizadas antes de criar os dropdowns
   document.querySelectorAll(".bloco-wrap").forEach(bw => {
     const titulo = bw.querySelector("h3");
     if (!titulo) return;
@@ -1635,7 +2222,7 @@ function atualizarAvisoIcone(mostrar) {
  * ────────────────────────────────────────────────────────────────────── */
 /* ── POPUP ALTERAR SALÁRIO COM DEPÓSITO NO MÊS ── */
 let _alterarSalarioPendente = false;
-let _salarioAnterior = { sal1: "", sal2: "" };
+let _salarioAnterior = { sal1: "", sal2: "", extrasSnapshot: null };
 
 function _totalDepositadoMes() {
   // Soma depósitos na reserva deste mês
@@ -1698,6 +2285,419 @@ function _executarAlteracaoSalario() {
   recalc(true, true);
 }
 
+/* ── ENTRADAS EXTRAS DE SALÁRIO ─────────────────────────────────────────
+ *  Popover flutuante posicionado ao lado do botão +, sem overlay.
+ *  Um único popover no DOM é reaproveitado para entrada 1 e 2.
+ *  Dados: extras_sal_ANO_MES = { '1': [{nome,valor},...], 'base1': '', ... }
+ * ────────────────────────────────────────────────────────────────────── */
+const _EXTRAS_SAL_KEY = () => `extras_sal_${anoAtual}_${indice}`;
+let _extrasEntradaAtiva = null;
+
+function _extrasCarregar() {
+  try {
+    const d = JSON.parse(localStorage.getItem(_EXTRAS_SAL_KEY()) || '{}');
+    if (!Array.isArray(d['1'])) d['1'] = [];
+    if (!Array.isArray(d['2'])) d['2'] = [];
+    // Por padrão, modo informativo ativo (true)
+    if (d['info1'] === undefined) d['info1'] = true;
+    if (d['info2'] === undefined) d['info2'] = true;
+    return d;
+  }
+  catch(e) { return { '1': [], '2': [], info1: true, info2: true }; }
+}
+function _extrasSalvar(dados) {
+  localStorage.setItem(_EXTRAS_SAL_KEY(), JSON.stringify(dados));
+}
+
+function _extrasIsSomar(entrada) {
+  const dados = _extrasCarregar();
+  return dados['info' + entrada] === true; // padrão false (não soma)
+}
+
+// Flag: guarda a entrada ativa quando o toggle de informativo dispara validação
+let _extrasInfoTogglePendente = null;
+// Flag: guarda {entrada, idx} quando exclusão de linha de extra dispara validação
+let _extrasDelPendente = null;
+// Flag: guarda {entrada, idx, novoValor} quando edição de valor dispara validação
+let _extrasEditValPendente = null;
+
+function toggleExtrasSalInfo() {
+  if (!_extrasEntradaAtiva) return;
+  const dados = _extrasCarregar();
+  const estaAtivando = !dados['info' + _extrasEntradaAtiva]; // true = ativando somar
+
+  // Se está DESATIVANDO o somar e há depósitos no mês, pede confirmação
+  if (!estaAtivando) {
+    const totalDep = _totalDepositadoMes();
+    if (totalDep > 0) {
+      _extrasInfoTogglePendente = _extrasEntradaAtiva;
+      const msg = `Existem <strong>${brl(totalDep)}</strong> depositados na reserva/meta este mês. Para deixar de somar a renda extra ao salário, esse valor será devolvido à previsão de saldo para um novo cálculo. Deseja continuar?`;
+      document.getElementById("popup-alterar-salario-msg").innerHTML = msg;
+      const overlay = document.getElementById("popup-alterar-salario-overlay");
+      const popup   = document.getElementById("popup-alterar-salario");
+      overlay.style.display = "block";
+      popup.style.display   = "block";
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        popup.style.opacity       = "1";
+        popup.style.transform     = "translate(-50%,-50%) scale(1)";
+        popup.style.pointerEvents = "auto";
+      }));
+      return;
+    }
+  }
+
+  dados['info' + _extrasEntradaAtiva] = estaAtivando;
+  _extrasSalvar(dados);
+  _extrasAtualizarToggleUI(_extrasEntradaAtiva);
+  recalcExtrasSal(_extrasEntradaAtiva);
+}
+
+function _extrasAtualizarToggleUI(entrada) {
+  const isInfo  = _extrasIsSomar(entrada);
+  const track   = document.getElementById('extras-sal-toggle-track');
+  const thumb   = document.getElementById('extras-sal-toggle-thumb');
+  if (!track || !thumb) return;
+  track.classList.toggle('ativo', isInfo);
+  thumb.style.transform = isInfo ? 'translateX(16px)' : 'translateX(0)';
+}
+
+function _extrasTotalSal(entrada) {
+  const dados  = _extrasCarregar();
+  const salBase = num(document.getElementById('sal' + entrada)?._valorBase || '');
+  const extras  = (dados[String(entrada)] || []).reduce((s, e) => s + num(e.valor), 0);
+  return salBase + extras;
+}
+
+function recalcExtrasSal(entrada) {
+  if (!entrada || mesFechado(anoAtual, indice)) return;
+  const dados    = _extrasCarregar();
+  const extras   = (dados[String(entrada)] || []).reduce((s, e) => s + num(e.valor), 0);
+  const salInput = document.getElementById('sal' + entrada);
+  const base     = num(salInput._valorBase || '');
+  const isInfo   = _extrasIsSomar(entrada);
+  // Só soma ao salário se isSomar=true
+  const total    = isInfo ? base + extras : base;
+  salInput.value = total > 0 ? brl(total) : (salInput._valorBase || '');
+  _atualizarReadonlySal(entrada);
+  agendarSalvoComFeedback();
+  recalc(true, true);
+}
+
+function toggleExtrasSal(entrada) {
+  const pop = document.getElementById('extras-sal-popover');
+  if (_extrasEntradaAtiva === entrada && pop.classList.contains('visivel')) {
+    fecharExtrasSal();
+    return;
+  }
+  _extrasEntradaAtiva = entrada;
+  const btn = document.getElementById('btn-extras-sal' + entrada);
+  const r   = btn.getBoundingClientRect();
+  pop.style.top  = (r.bottom + 8) + 'px';
+  pop.style.left = Math.max(8, r.left - 160) + 'px';
+  _extrasAtualizarToggleUI(entrada);
+  _extrasRenderizar(entrada);
+  _extrasAtualizarBaseUI(entrada);
+  pop.classList.add('visivel');
+  [1, 2].forEach(e => document.getElementById('btn-extras-sal' + e).classList.remove('ativo'));
+  btn.classList.add('ativo');
+}
+
+function _extrasAtualizarBaseUI(entrada) {
+  const baseInput = document.getElementById('extras-sal-base-input');
+  if (!baseInput) return;
+  const salInput = document.getElementById('sal' + entrada);
+  // Mostra o _valorBase (base puro) se existir, senão o valor atual do campo
+  const base = salInput._valorBase !== undefined && salInput._valorBase !== ''
+    ? salInput._valorBase
+    : (salInput.value || '');
+  baseInput.value = base;
+  // Eventos: formata e sincroniza com o campo principal
+  baseInput.oninput = () => fmtInput(baseInput);
+  baseInput.onblur  = () => {
+    fmt(baseInput);
+    const salInp = document.getElementById('sal' + _extrasEntradaAtiva);
+    if (!salInp) return;
+    salInp._valorBase = baseInput.value;
+    // Grava o novo base em dados['base'+entrada] para persistência
+    const d = _extrasCarregar();
+    d['base' + _extrasEntradaAtiva] = baseInput.value;
+    _extrasSalvar(d);
+    recalcExtrasSal(_extrasEntradaAtiva);
+  };
+  baseInput.onkeydown = (e) => { if (e.key === 'Enter') { fmt(baseInput); baseInput.blur(); } };
+}
+
+function fecharExtrasSal() {
+  document.getElementById('extras-sal-popover').classList.remove('visivel');
+  [1, 2].forEach(e => document.getElementById('btn-extras-sal' + e)?.classList.remove('ativo'));
+  _extrasEntradaAtiva = null;
+}
+
+function adicionarExtraSal(entrada) {
+  if (!entrada) return;
+  if (mesFechado(anoAtual, indice)) { exibirToastSaldo('Mês fechado.'); return; }
+  const dados = _extrasCarregar();
+  if ((dados[String(entrada)] || []).length >= 8) { exibirToastSaldo('Limite de 8 entradas extras atingido.'); return; }
+  // Grava o base puro na primeira extra, para que _extrasCarregarMes restaure corretamente
+  if (!dados['base' + entrada] && dados['base' + entrada] !== '') {
+    const salInput = document.getElementById('sal' + entrada);
+    dados['base' + entrada] = salInput._valorBase !== undefined ? salInput._valorBase : salInput.value;
+  }
+  dados[String(entrada)].push({ nome: '', valor: '' });
+  _extrasSalvar(dados);
+  _extrasRenderizar(entrada);
+}
+
+function _extrasRenderizar(entrada) {
+  const dados = _extrasCarregar();
+  const lista = dados[String(entrada)] || [];
+  const el    = document.getElementById('extras-sal-lista');
+  el.innerHTML = '';
+  // Actualiza estado readonly do campo sal
+  _atualizarReadonlySal(entrada);
+
+  lista.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'extras-sal-row';
+
+    const nomeInput = document.createElement('input');
+    nomeInput.type         = 'text';
+    nomeInput.className    = 'extras-sal-nome';
+    nomeInput.placeholder  = 'Ex: 13º salário';
+    nomeInput.value        = item.nome;
+    nomeInput.autocomplete = 'off';
+    nomeInput.oninput = () => {
+      const d = _extrasCarregar();
+      d[String(entrada)][idx].nome = nomeInput.value;
+      _extrasSalvar(d);
+    };
+    nomeInput.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); valInput.focus(); valInput.select(); } };
+
+    const valInput = document.createElement('input');
+    valInput.type         = 'text';
+    valInput.className    = 'extras-sal-valor';
+    valInput.placeholder  = 'R$ 0,00';
+    valInput.value        = item.valor;
+    valInput.autocomplete = 'off';
+    valInput.oninput  = () => fmtInput(valInput);
+    let _valAnterior = 0;
+    valInput.onfocus  = () => {
+      row.classList.add('val-focado');
+      _valAnterior = num(valInput.value);
+    };
+    valInput.onblur   = () => {
+      row.classList.remove('val-focado');
+      fmt(valInput);
+      const novoVal = num(valInput.value);
+      const totalDep = _totalDepositadoMes();
+      // Se reduziu o valor e há depósitos, pede confirmação
+      if (totalDep > 0 && novoVal < _valAnterior) {
+        // Restaura valor anterior visualmente enquanto aguarda confirmação
+        const dTemp = _extrasCarregar();
+        valInput.value = dTemp[String(entrada)][idx].valor;
+        fmt(valInput);
+        _extrasInfoTogglePendente = null;
+        _extrasDelPendente = null;
+        _extrasEditValPendente = { entrada, idx, novoValor: brl(novoVal) };
+        const msg = `Existem <strong>${brl(totalDep)}</strong> depositados na reserva/meta este mês. Para alterar esta entrada, esse valor será devolvido à previsão de saldo para um novo cálculo. Deseja continuar?`;
+        document.getElementById("popup-alterar-salario-msg").innerHTML = msg;
+        const overlay = document.getElementById("popup-alterar-salario-overlay");
+        const popup   = document.getElementById("popup-alterar-salario");
+        overlay.style.display = "block";
+        popup.style.display   = "block";
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          popup.style.opacity       = "1";
+          popup.style.transform     = "translate(-50%,-50%) scale(1)";
+          popup.style.pointerEvents = "auto";
+        }));
+        return;
+      }
+      const d = _extrasCarregar();
+      d[String(entrada)][idx].valor = valInput.value;
+      _extrasSalvar(d);
+      recalcExtrasSal(entrada);
+    };
+    valInput.onkeydown = (e) => { if (e.key === 'Enter') { fmt(valInput); valInput.blur(); } };
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'extras-sal-del';
+    delBtn.innerHTML = '×';
+    delBtn.tabIndex  = -1;
+    delBtn.onclick   = () => {
+      // Se a linha está em branco, apaga sem validação
+      const d0 = _extrasCarregar();
+      const item0 = (d0[String(entrada)] || [])[idx];
+      const linhaVazia = !item0 || (!num(item0.valor) && !(item0.nome || '').trim());
+      // Se há depósitos no mês E a linha tem valor, valida antes de remover
+      const totalDep = _totalDepositadoMes();
+      if (totalDep > 0 && !linhaVazia) {
+        _extrasInfoTogglePendente = null;
+        _extrasDelPendente = { entrada, idx };
+        const msg = `Existem <strong>${brl(totalDep)}</strong> depositados na reserva/meta este mês. Para remover esta entrada, esse valor será devolvido à previsão de saldo para um novo cálculo. Deseja continuar?`;
+        document.getElementById("popup-alterar-salario-msg").innerHTML = msg;
+        const overlay = document.getElementById("popup-alterar-salario-overlay");
+        const popup   = document.getElementById("popup-alterar-salario");
+        overlay.style.display = "block";
+        popup.style.display   = "block";
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          popup.style.opacity       = "1";
+          popup.style.transform     = "translate(-50%,-50%) scale(1)";
+          popup.style.pointerEvents = "auto";
+        }));
+        return;
+      }
+      const d = _extrasCarregar();
+      d[String(entrada)].splice(idx, 1);
+      _extrasSalvar(d);
+      _extrasRenderizar(entrada);
+      recalcExtrasSal(entrada);
+    };
+
+    const enterBtn = document.createElement('button');
+    enterBtn.className = 'extras-sal-enter';
+    enterBtn.innerHTML = '↵';
+    enterBtn.tabIndex = -1;
+    enterBtn.onmousedown = (e) => { e.preventDefault(); fmt(valInput); valInput.blur(); };
+
+    row.appendChild(nomeInput);
+    row.appendChild(valInput);
+    row.appendChild(enterBtn);
+    row.appendChild(delBtn);
+    el.appendChild(row);
+  });
+
+  el.style.marginBottom = lista.length > 0 ? '10px' : '0';
+}
+
+function _extrasCarregarMes() {
+  [1, 2].forEach(entrada => {
+    const salInput = document.getElementById('sal' + entrada);
+    const dados    = _extrasCarregar();
+    const isInfo   = _extrasIsSomar(entrada);
+    const extras   = (dados[String(entrada)] || []).reduce((s, e) => s + num(e.valor), 0);
+    // Usa o base puro gravado em dados['base'+entrada] como fonte de verdade.
+    // Isso evita dupla soma independente do que salvarMes gravou no campo.
+    const baseSalvo = dados['base' + entrada];
+    if (baseSalvo !== undefined) {
+      salInput.value      = baseSalvo;
+      salInput._valorBase = baseSalvo;
+    } else {
+      salInput._valorBase = salInput.value;
+    }
+    // Só soma ao campo se isSomar=true
+    if (isInfo && extras > 0) {
+      salInput.value = brl(num(salInput._valorBase) + extras);
+    }
+    // Aplica estado readonly se há extras
+    _atualizarReadonlySal(entrada);
+  });
+  if (_extrasEntradaAtiva) _extrasRenderizar(_extrasEntradaAtiva);
+}
+
+function limparEntradaSal(entrada) {
+  if (mesFechado(anoAtual, indice)) { exibirToastSaldo('Mês fechado.'); return; }
+  // Guarda snapshot das extras ANTES de limpar, para poder restaurar se cancelar
+  _salarioAnterior.extrasSnapshot = JSON.parse(JSON.stringify(_extrasCarregar()));
+  const dados = _extrasCarregar();
+  dados[String(entrada)] = [];
+  delete dados['base' + entrada];
+  _extrasSalvar(dados);
+  const salInput = document.getElementById('sal' + entrada);
+  salInput.value = '';
+  salInput._valorBase = '';
+  if (_extrasEntradaAtiva === entrada) _extrasRenderizar(entrada);
+  _atualizarReadonlySal(entrada);
+  confirmarSalario();
+}
+
+// Fecha popover ao clicar fora
+let _extrasPopoverBlocked = false;
+document.addEventListener('mousedown', function(e) {
+  // Bloqueia se a flag estiver ativa OU se o popup de confirmação estiver aberto
+  if (_extrasPopoverBlocked) return;
+  const confirmPopup = document.getElementById('popup-alterar-salario');
+  if (confirmPopup && confirmPopup.style.display === 'block') return;
+  const pop = document.getElementById('extras-sal-popover');
+  if (!pop || !pop.classList.contains('visivel')) return;
+  if (pop.contains(e.target)) return;
+  if (e.target.closest('.btn-extras-sal')) return;
+  fecharExtrasSal();
+});
+
+// Actualiza o estado readonly do campo sal quando há extras activas
+function _atualizarReadonlySal(entrada) {
+  const input = document.getElementById('sal' + entrada);
+  if (!input) return;
+  const dados = _extrasCarregar();
+  const temExtras = (dados[String(entrada)] || []).length > 0;
+  if (temExtras) {
+    input.classList.add('com-extras');
+    input.readOnly = true;
+  } else {
+    input.classList.remove('com-extras');
+    input.readOnly = false;
+  }
+}
+
+// Se o usuário digita diretamente no sal, limpa extras e guarda novo base
+document.addEventListener('DOMContentLoaded', function() {
+  [1, 2].forEach(entrada => {
+    const input = document.getElementById('sal' + entrada);
+    if (!input) return;
+
+    // Enter: só confirma salário se não há extras activas
+    input.addEventListener('keydown', function(e) {
+      if (e.key !== 'Enter') return;
+      const dados = _extrasCarregar();
+      const temExtras = (dados[String(entrada)] || []).length > 0;
+      if (temExtras) {
+        e.preventDefault();
+        input.blur();
+      } else {
+        confirmarSalario();
+      }
+    });
+
+    // Input: se há extras activas, rejeitar digitação e abrir popover
+    input.addEventListener('input', function() {
+      const dados = _extrasCarregar();
+      const temExtras = (dados[String(entrada)] || []).length > 0;
+      if (temExtras) {
+        // Restaura o valor total e abre o popover para edição
+        const extras = (dados[String(entrada)] || []).reduce((s, e) => s + num(e.valor), 0);
+        const isInfo = dados['info' + entrada] === true;
+        const base = num(input._valorBase || '');
+        const total = isInfo ? base + extras : base;
+        input.value = total > 0 ? brl(total) : (input._valorBase || '');
+        // Abre popover se não estiver aberto
+        if (_extrasEntradaAtiva !== entrada) {
+          toggleExtrasSal(entrada);
+        }
+        return;
+      }
+      input._valorBase = input.value;
+      // Sincroniza campo base do popover se estiver aberto para esta entrada
+      if (_extrasEntradaAtiva === entrada) {
+        const baseInput = document.getElementById('extras-sal-base-input');
+        if (baseInput) baseInput.value = input.value;
+      }
+    });
+
+    // Blur: se há extras, restaura o total (não aceita valor digitado directamente)
+    input.addEventListener('blur', function() {
+      const dados = _extrasCarregar();
+      const temExtras = (dados[String(entrada)] || []).length > 0;
+      if (temExtras) {
+        const extras = (dados[String(entrada)] || []).reduce((s, e) => s + num(e.valor), 0);
+        const isInfo = dados['info' + entrada] === true;
+        const base = num(input._valorBase || '');
+        const total = isInfo ? base + extras : base;
+        input.value = total > 0 ? brl(total) : (input._valorBase || '');
+      }
+    });
+  });
+});
+
 function confirmarSalario() {
   if (mesFechado(anoAtual, indice)) {
     exibirToastSaldo("Este mês está fechado. Reabra-o para editar o salário.");
@@ -1728,6 +2728,10 @@ function confirmarSalario() {
         // Guarda os valores salvos para restaurar se cancelar
         _salarioAnterior.sal1 = dadosSalvos.sal1 || "";
         _salarioAnterior.sal2 = dadosSalvos.sal2 || "";
+        // Guarda snapshot das extras se ainda não foi salvo por limparEntradaSal
+        if (!_salarioAnterior.extrasSnapshot) {
+          _salarioAnterior.extrasSnapshot = JSON.parse(JSON.stringify(_extrasCarregar()));
+        }
 
         const msg = `Existem <strong>${brl(totalDep)}</strong> depositados na reserva/meta este mês. Para alterar o salário, esse valor será devolvido à previsão de saldo para um novo cálculo. Deseja continuar?`;
         document.getElementById("popup-alterar-salario-msg").innerHTML = msg;
@@ -1750,12 +2754,62 @@ function confirmarSalario() {
 }
 
 function fecharPopupAlterarSalario() {
+  // Se veio do toggle, exclusão ou edição de valor de extra, apenas fecha — sem restaurar salários
+  if (_extrasInfoTogglePendente !== null || _extrasDelPendente !== null || _extrasEditValPendente !== null) {
+    const entradaReabrir = _extrasInfoTogglePendente !== null
+      ? _extrasInfoTogglePendente
+      : _extrasDelPendente !== null
+        ? _extrasDelPendente.entrada
+        : _extrasEditValPendente.entrada;
+    _extrasInfoTogglePendente = null;
+    _extrasDelPendente = null;
+    _extrasEditValPendente = null;
+    const overlay = document.getElementById("popup-alterar-salario-overlay");
+    const popup   = document.getElementById("popup-alterar-salario");
+    popup.style.opacity       = "0";
+    popup.style.transform     = "translate(-50%,-50%) scale(0.94)";
+    popup.style.pointerEvents = "none";
+    setTimeout(() => {
+      popup.style.display   = "none";
+      overlay.style.display = "none";
+      // Reabre o popover de renda extra (bloqueia mousedown para não fechar imediatamente)
+      const popover = document.getElementById("extras-sal-popover");
+      if (popover && entradaReabrir !== null) {
+        _extrasPopoverBlocked = true;
+        _extrasEntradaAtiva = entradaReabrir;
+        _extrasRenderizar(entradaReabrir);
+        popover.classList.add("visivel");
+        setTimeout(() => { _extrasPopoverBlocked = false; }, 300);
+      }
+    }, 220);
+    return;
+  }
   // Restaura os valores anteriores na tela para que o cancelamento não deixe campos errados
   if (_salarioAnterior.sal1 !== undefined) {
     document.getElementById("sal1").value = _salarioAnterior.sal1;
     document.getElementById("sal2").value = _salarioAnterior.sal2;
-    _salarioAnterior = { sal1: "", sal2: "" };
+    // Restaura também os dados das extras se havia snapshot salvo
+    if (_salarioAnterior.extrasSnapshot) {
+      _extrasSalvar(_salarioAnterior.extrasSnapshot);
+      // Atualiza _valorBase do campo com o valor do snapshot restaurado
+      [1, 2].forEach(e => {
+        const inp = document.getElementById('sal' + e);
+        if (inp) {
+          const snap = _salarioAnterior.extrasSnapshot;
+          const base = snap['base' + e] || '';
+          inp._valorBase = base;
+          const extras = (snap[String(e)] || []).reduce((s, x) => s + num(x.valor), 0);
+          const isInfo = snap['info' + e] === true;
+          const total = isInfo ? num(base) + extras : num(base);
+          inp.value = total > 0 ? brl(total) : base;
+        }
+      });
+      // Re-renderiza o popover se estiver aberto
+      if (_extrasEntradaAtiva !== null) _extrasRenderizar(_extrasEntradaAtiva);
+    }
+    _salarioAnterior = { sal1: "", sal2: "", extrasSnapshot: null };
     recalc();
+    salvarMes(); // persiste o estado restaurado — sem isso o localStorage fica com o valor zerado
   }
 
   const overlay = document.getElementById("popup-alterar-salario-overlay");
@@ -1770,7 +2824,7 @@ function fecharPopupAlterarSalario() {
 }
 
 function _fecharPopupAlterarSalarioSemRestaurar() {
-  _salarioAnterior = { sal1: "", sal2: "" }; // limpa sem restaurar
+  _salarioAnterior = { sal1: "", sal2: "", extrasSnapshot: null }; // limpa sem restaurar
   const overlay = document.getElementById("popup-alterar-salario-overlay");
   const popup   = document.getElementById("popup-alterar-salario");
   popup.style.opacity       = "0";
@@ -1783,6 +2837,177 @@ function _fecharPopupAlterarSalarioSemRestaurar() {
 }
 
 function confirmarAlterarSalario() {
+  // Se a confirmação veio de edição de valor reduzido numa linha extra
+  if (_extrasEditValPendente !== null) {
+    const { entrada, idx, novoValor } = _extrasEditValPendente;
+    _extrasEditValPendente = null;
+    _fecharPopupAlterarSalarioSemRestaurar();
+
+    // Reverte depósitos do mês
+    {
+      const reserva = carregarSaldoReserva();
+      const movsFiltrados = (reserva.movimentos || []).filter(m =>
+        !(m.ano === anoAtual && m.mes === indice && !m.origem)
+      );
+      if (movsFiltrados.length !== (reserva.movimentos || []).length) {
+        reserva.movimentos = movsFiltrados;
+        reserva.saldo = calcularSaldoAteMes(reserva.movimentos, anoAtual, indice);
+        salvarSaldoReserva(reserva);
+        atualizarDisplayReserva();
+        localStorage.setItem("dep_reserva_" + anoAtual + "_" + indice, "0");
+      }
+    }
+    _META_KEYS.forEach((chaveLS, slotIdx) => {
+      const metaSlot = carregarDadosMeta(slotIdx);
+      if (!metaSlot) return;
+      const movsFiltrados = (metaSlot.movimentos || []).filter(m =>
+        !(m.ano === anoAtual && m.mes === indice && !m.origem)
+      );
+      if (movsFiltrados.length !== (metaSlot.movimentos || []).length) {
+        metaSlot.movimentos = movsFiltrados;
+        metaSlot.saldoAcumulado = brl(calcularSaldoAteMes(metaSlot.movimentos, anoAtual, indice));
+        localStorage.setItem(chaveLS, JSON.stringify(metaSlot));
+        localStorage.setItem("dep_meta_" + slotIdx + "_" + anoAtual + "_" + indice, "0");
+      }
+    });
+    atualizarBarraReserva();
+    localStorage.setItem("mov_previsao_" + anoAtual + "_" + indice, "0");
+
+    // Aplica o novo valor
+    const d = _extrasCarregar();
+    if (d[String(entrada)] && d[String(entrada)][idx] !== undefined) {
+      d[String(entrada)][idx].valor = novoValor;
+      _extrasSalvar(d);
+    }
+    _extrasRenderizar(entrada);
+    recalcExtrasSal(entrada);
+    recalc();
+    salvarMes();
+
+    // Reabre popover
+    const popover = document.getElementById("extras-sal-popover");
+    if (popover) {
+      _extrasPopoverBlocked = true;
+      _extrasEntradaAtiva = entrada;
+      popover.classList.add("visivel");
+      setTimeout(() => { _extrasPopoverBlocked = false; }, 300);
+    }
+    return;
+  }
+
+  // Se a confirmação veio do toggle de renda extra informativa, trata separadamente
+  if (_extrasInfoTogglePendente !== null) {
+    const entrada = _extrasInfoTogglePendente;
+    _extrasInfoTogglePendente = null;
+    _fecharPopupAlterarSalarioSemRestaurar();
+
+    // Reverte depósitos do mês (mesma lógica do fluxo de salário)
+    {
+      const reserva = carregarSaldoReserva();
+      const movsFiltrados = (reserva.movimentos || []).filter(m =>
+        !(m.ano === anoAtual && m.mes === indice && !m.origem)
+      );
+      if (movsFiltrados.length !== (reserva.movimentos || []).length) {
+        reserva.movimentos = movsFiltrados;
+        reserva.saldo = calcularSaldoAteMes(reserva.movimentos, anoAtual, indice);
+        salvarSaldoReserva(reserva);
+        atualizarDisplayReserva();
+        localStorage.setItem("dep_reserva_" + anoAtual + "_" + indice, "0");
+      }
+    }
+    _META_KEYS.forEach((chaveLS, slotIdx) => {
+      const metaSlot = carregarDadosMeta(slotIdx);
+      if (!metaSlot) return;
+      const movsFiltrados = (metaSlot.movimentos || []).filter(m =>
+        !(m.ano === anoAtual && m.mes === indice && !m.origem)
+      );
+      if (movsFiltrados.length !== (metaSlot.movimentos || []).length) {
+        metaSlot.movimentos = movsFiltrados;
+        metaSlot.saldoAcumulado = brl(calcularSaldoAteMes(metaSlot.movimentos, anoAtual, indice));
+        localStorage.setItem(chaveLS, JSON.stringify(metaSlot));
+        localStorage.setItem("dep_meta_" + slotIdx + "_" + anoAtual + "_" + indice, "0");
+      }
+    });
+    atualizarBarraReserva();
+    localStorage.setItem("mov_previsao_" + anoAtual + "_" + indice, "0");
+    const _chaveCobConf2 = "cobrir_valor_" + anoAtual + "_" + indice;
+    const _cobValConf2 = parseFloat(localStorage.getItem(_chaveCobConf2) || "0");
+    if (_cobValConf2 > 0) {
+      const _reservaConf2 = carregarSaldoReserva();
+      _reservaConf2.movimentos = (_reservaConf2.movimentos || []).filter(m =>
+        !(m.ano === anoAtual && m.mes === indice && m.acao === "retirar" && m.origem === "cobrir-deficit")
+      );
+      _reservaConf2.saldo = calcularSaldoAteMes(_reservaConf2.movimentos, anoAtual, indice);
+      salvarSaldoReserva(_reservaConf2);
+      atualizarDisplayReserva();
+      localStorage.setItem(_chaveCobConf2, "0");
+    }
+    localStorage.removeItem('mov_previsao_blocos_' + anoAtual + '_' + indice);
+
+    // Aplica o toggle informativo e recalcula
+    const dados = _extrasCarregar();
+    dados['info' + entrada] = false;
+    _extrasSalvar(dados);
+    _extrasAtualizarToggleUI(entrada);
+    recalcExtrasSal(entrada);
+    return;
+  }
+
+  // Se veio da exclusão de uma linha de extra
+  if (_extrasDelPendente !== null) {
+    const { entrada: entDel, idx: idxDel } = _extrasDelPendente;
+    _extrasDelPendente = null;
+    _fecharPopupAlterarSalarioSemRestaurar();
+    {
+      const reserva = carregarSaldoReserva();
+      const movsFiltrados = (reserva.movimentos || []).filter(m =>
+        !(m.ano === anoAtual && m.mes === indice && !m.origem)
+      );
+      if (movsFiltrados.length !== (reserva.movimentos || []).length) {
+        reserva.movimentos = movsFiltrados;
+        reserva.saldo = calcularSaldoAteMes(reserva.movimentos, anoAtual, indice);
+        salvarSaldoReserva(reserva);
+        atualizarDisplayReserva();
+        localStorage.setItem("dep_reserva_" + anoAtual + "_" + indice, "0");
+      }
+    }
+    _META_KEYS.forEach((chaveLS, slotIdx) => {
+      const metaSlot = carregarDadosMeta(slotIdx);
+      if (!metaSlot) return;
+      const movsFiltrados = (metaSlot.movimentos || []).filter(m =>
+        !(m.ano === anoAtual && m.mes === indice && !m.origem)
+      );
+      if (movsFiltrados.length !== (metaSlot.movimentos || []).length) {
+        metaSlot.movimentos = movsFiltrados;
+        metaSlot.saldoAcumulado = brl(calcularSaldoAteMes(metaSlot.movimentos, anoAtual, indice));
+        localStorage.setItem(chaveLS, JSON.stringify(metaSlot));
+        localStorage.setItem("dep_meta_" + slotIdx + "_" + anoAtual + "_" + indice, "0");
+      }
+    });
+    atualizarBarraReserva();
+    localStorage.setItem("mov_previsao_" + anoAtual + "_" + indice, "0");
+    const _chaveCobDel = "cobrir_valor_" + anoAtual + "_" + indice;
+    const _cobValDel = parseFloat(localStorage.getItem(_chaveCobDel) || "0");
+    if (_cobValDel > 0) {
+      const _reservaDel = carregarSaldoReserva();
+      _reservaDel.movimentos = (_reservaDel.movimentos || []).filter(m =>
+        !(m.ano === anoAtual && m.mes === indice && m.acao === "retirar" && m.origem === "cobrir-deficit")
+      );
+      _reservaDel.saldo = calcularSaldoAteMes(_reservaDel.movimentos, anoAtual, indice);
+      salvarSaldoReserva(_reservaDel);
+      atualizarDisplayReserva();
+      localStorage.setItem(_chaveCobDel, "0");
+    }
+    localStorage.removeItem('mov_previsao_blocos_' + anoAtual + '_' + indice);
+    const d = _extrasCarregar();
+    d[String(entDel)].splice(idxDel, 1);
+    if (d[String(entDel)].length === 0) delete d['base' + entDel];
+    _extrasSalvar(d);
+    _extrasRenderizar(entDel);
+    recalcExtrasSal(entDel);
+    return;
+  }
+
   _fecharPopupAlterarSalarioSemRestaurar();
 
   const chaveAdj = "mov_previsao_" + anoAtual + "_" + indice;
@@ -2016,7 +3241,9 @@ document.addEventListener("click", function(e) {
   const lista = document.getElementById("mes-dropdown-list");
   meses.forEach((nome, i) => {
     const item = document.createElement("div");
-    item.className = "mes-dropdown-item" + (i === indice ? " ativo" : "");
+    const _mesHojeM = new Date().getMonth();
+    const _anoHojeM  = new Date().getFullYear();
+    item.className = "mes-dropdown-item" + (i === indice ? " ativo" : "") + (i === _mesHojeM && anoAtual === _anoHojeM ? " hoje" : "");
     item.textContent = nome;
     item.addEventListener("click", () => {
       if (i === indice) { fecharMesDropdown(); return; }
@@ -2050,8 +3277,11 @@ function toggleMesDropdown() {
   const wrap = document.getElementById("mes-dropdown-wrap");
   const aberto = lista.classList.toggle("open");
   wrap.classList.toggle("aberto", aberto);
+  const _mesHojeT = new Date().getMonth();
+  const _anoHojeT  = new Date().getFullYear();
   lista.querySelectorAll(".mes-dropdown-item").forEach((el, i) => {
     el.classList.toggle("ativo", i === indice);
+    el.classList.toggle("hoje", i === _mesHojeT && anoAtual === _anoHojeT);
   });
 }
 
@@ -2103,8 +3333,8 @@ function salvarMes() {
   const chave = "planejamento_" + anoAtual + "_" + indice;
   const dados = {};
 
-  dados.sal1 = document.getElementById("sal1").value;
-  dados.sal2 = document.getElementById("sal2").value;
+  dados.sal1 = document.getElementById("sal1")._valorBase || document.getElementById("sal1").value;
+  dados.sal2 = document.getElementById("sal2")._valorBase || document.getElementById("sal2").value;
 
   document.querySelectorAll(".bloco-wrap").forEach((bw, bwIdx) => {
     bw.querySelectorAll(".linha").forEach((linha, lIdx) => {
@@ -2148,7 +3378,24 @@ function carregarMes() {
 
   // Limpa todos os campos primeiro
   document.querySelectorAll(".val-input").forEach(i => i.value = "");
-  document.querySelectorAll(".linha select").forEach(s => s.value = "");
+  document.querySelectorAll(".linha select").forEach(s => {
+    s.value = "";
+    // Reseta display customizado imediatamente para evitar flash de cor errada
+    if (s._customDisplay) {
+      const d = s._customDisplay;
+      d.style.background = "";
+      d.style.color = "";
+      d.style.borderColor = "";
+      d.classList.remove("colored");
+      d.childNodes.forEach(n => { if (n !== d._clearBtn) n.remove(); });
+      d.insertBefore(document.createTextNode("Selecione"), d.firstChild);
+      if (d._clearBtn) {
+        d._clearBtn.classList.remove("visible");
+        d._clearBtn.style.color = "";
+      }
+      d.classList.add("vazio");
+    }
+  });
   document.querySelectorAll(".linha input[type=checkbox]").forEach(c => c.checked = false);
   document.getElementById("sal1").value = "";
   document.getElementById("sal2").value = "";
@@ -2175,6 +3422,7 @@ function carregarMes() {
     });
   }
 
+  _extrasCarregarMes();
   recalc();
   sincronizarDropdownsBancos();
   document.querySelectorAll(".linha").forEach(linha => atualizarLinhaPaga(linha));
@@ -6677,6 +7925,7 @@ function exportarDados() {
 
   const prefixos = [
     'planejamento_', // aba 'Mensal' na UI
+    'extras_sal_',
     'mov_previsao_',
     'mov_previsao_blocos_',
     'cobrir_valor_',
@@ -6688,6 +7937,7 @@ function exportarDados() {
     'simulador_reserva_', // simulador de reserva por ano
   ];
   const chavesFixas = [
+    'categorias_personalizadas',
     'reserva_saldo_v1',
     'reserva_meta_v2',
     'reserva_meta_v2_b',
@@ -6772,9 +8022,10 @@ function _confirmarImportacao() {
   // apagou após exportar) continuariam no localStorage como dados fantasma.
   const prefixosApp = [
     'planejamento_', 'mov_previsao_', 'cobrir_valor_', 'dep_reserva_',
-    'dep_meta_', 'cobrir_previsao_', 'mes_fechado_', 'diario_', 'simulador_reserva_',
+    'dep_meta_', 'cobrir_previsao_', 'mes_fechado_', 'diario_', 'simulador_reserva_', 'extras_sal_',
   ];
   const chavesFixasApp = [
+    'categorias_personalizadas',
     'reserva_saldo_v1', 'reserva_meta_v2', 'reserva_meta_v2_b', 'reserva_meta_v2_c',
     'cfg_alerta_economia', 'cfg_alerta_pct', 'cfg_alerta_cor',
   ];
@@ -6850,31 +8101,58 @@ function mudarAba(aba) {
   const elBanner  = document.getElementById('mes-fechado-banner');
   const elLayout  = document.getElementById('view-main-layout');
   const elDiario  = document.getElementById('view-diario');
+  const elAnual   = document.getElementById('view-anual');
   const fabMensal = document.getElementById('fab-mensal');
   const fabDiario = document.getElementById('fab-diario');
   const tabP      = document.getElementById('tab-planejamento');
   const tabD      = document.getElementById('tab-diario');
+  const tabA      = document.getElementById('tab-anual');
 
-  const vaiParaDiario = (aba === 'diario');
-  const jaNaDiario = elDiario && elDiario.style.display !== 'none';
-  if (vaiParaDiario && jaNaDiario) return;
-  if (!vaiParaDiario && !jaNaDiario) return;
+  // Detecta aba atual com base em qual view está visível
+  let abaAtual = 'planejamento';
+  if (elDiario && elDiario.style.display !== 'none') abaAtual = 'diario';
+  else if (elAnual && elAnual.style.display !== 'none') abaAtual = 'anual';
+
+  if (aba === abaAtual) return;
 
   _mudarAbaEmAndamento = true;
   clearTimeout(_salvoDebounce);
   salvarMes();
 
-  if (vaiParaDiario) {
-    tabP.classList.remove('ativo'); tabD.classList.add('ativo');
+  // Atualiza tabs
+  if (tabP) tabP.classList.remove('ativo');
+  if (tabD) tabD.classList.remove('ativo');
+  if (tabA) tabA.classList.remove('ativo');
+  if (aba === 'planejamento' && tabP) tabP.classList.add('ativo');
+  if (aba === 'diario'       && tabD) tabD.classList.add('ativo');
+  if (aba === 'anual'        && tabA) tabA.classList.add('ativo');
+
+  // Elementos a esconder (view atual)
+  const elsAtual = [];
+  if (abaAtual === 'diario') {
+    if (elDiario) elsAtual.push(elDiario);
+  } else if (abaAtual === 'anual') {
+    if (elAnual) elsAtual.push(elAnual);
   } else {
-    tabD.classList.remove('ativo'); tabP.classList.add('ativo');
+    if (elMes)    elsAtual.push(elMes);
+    if (elLayout) elsAtual.push(elLayout);
+    if (elBanner && elBanner.style.display !== 'none') elsAtual.push(elBanner);
+  }
+
+  // Elementos a mostrar (view destino)
+  const elsDestino = [];
+  if (aba === 'diario') {
+    if (elDiario) elsDestino.push(elDiario);
+  } else if (aba === 'anual') {
+    if (elAnual) elsDestino.push(elAnual);
+  } else {
+    if (elMes)    elsDestino.push(elMes);
+    if (elLayout) elsDestino.push(elLayout);
   }
 
   const FADE_MS = 130;
-  const elsAtual   = vaiParaDiario ? [elMes, elLayout, elBanner].filter(Boolean) : [elDiario].filter(Boolean);
-  const elsDestino = vaiParaDiario ? [elDiario].filter(Boolean) : [elMes, elLayout].filter(Boolean);
 
-  // Fase 1: fade out
+  // Fase 1: fade out da view atual
   elsAtual.forEach(el => {
     el.style.transition    = `opacity ${FADE_MS}ms ease`;
     el.style.opacity       = '0';
@@ -6882,7 +8160,7 @@ function mudarAba(aba) {
   });
 
   setTimeout(() => {
-    // Fase 2: esconde atual
+    // Fase 2: esconde view atual
     elsAtual.forEach(el => {
       el.style.display       = 'none';
       el.style.opacity       = '';
@@ -6890,26 +8168,29 @@ function mudarAba(aba) {
       el.style.pointerEvents = '';
     });
 
-    if (vaiParaDiario) {
+    // FABs
+    if (aba === 'diario') {
       if (fabMensal) fabMensal.style.display = 'none';
       if (fabDiario) fabDiario.style.display = 'flex';
     } else {
       if (fabDiario) fabDiario.style.display = 'none';
-      if (fabMensal) fabMensal.style.display = 'flex';
+      if (fabMensal) fabMensal.style.display = aba === 'anual' ? 'none' : 'flex';
     }
 
-    // Fase 3: destino invisível + carrega dados
+    // Fase 3: prepara view destino (invisível)
     elsDestino.forEach(el => {
       el.style.opacity    = '0';
       el.style.transition = 'none';
-      el.style.display    = (el === elDiario) ? 'block' : 'flex';
+      el.style.display    = (el === elDiario || el === elAnual) ? 'block' : 'flex';
     });
-    if (!vaiParaDiario && elBanner) elBanner.style.display = '';
+    if (aba === 'planejamento' && elBanner) elBanner.style.display = '';
 
-    if (vaiParaDiario) _atualizarDiarioTituloMes();
-    carregarMes();
+    // Carrega dados da view destino
+    if (aba === 'diario')       renderizarDiario();
+    if (aba === 'anual')        { _anualAno = new Date().getFullYear(); anualCarregar(); }
+    if (aba === 'planejamento') carregarMes();
 
-    // Fase 4: fade in
+    // Fase 4: fade in da view destino
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         elsDestino.forEach(el => {
@@ -6937,7 +8218,9 @@ function trocarAba(aba) { mudarAba(aba); }
   if (!lista) return;
   meses.forEach((nome, i) => {
     const item = document.createElement('div');
-    item.className = 'diario-mes-dropdown-item' + (i === indice ? ' ativo' : '');
+    const _mesHojeDC = new Date().getMonth();
+    const _anoHojeDC  = new Date().getFullYear();
+    item.className = 'diario-mes-dropdown-item' + (i === indice ? ' ativo' : '') + (i === _mesHojeDC && anoAtual === _anoHojeDC ? ' hoje' : '');
     item.textContent = nome;
     item.addEventListener('click', () => {
       if (i === indice) { fecharDiarioMesDropdown(); return; }
@@ -6972,8 +8255,11 @@ function _atualizarDiarioTituloMes() {
   if (el) el.textContent = meses[indice];
   const lista = document.getElementById('diario-mes-dropdown-list');
   if (lista) {
+    const _mesHojeDU = new Date().getMonth();
+    const _anoHojeDU  = new Date().getFullYear();
     lista.querySelectorAll('.diario-mes-dropdown-item').forEach((item, i) => {
       item.classList.toggle('ativo', i === indice);
+      item.classList.toggle('hoje', i === _mesHojeDU && anoAtual === _anoHojeDU);
     });
   }
 }
@@ -6984,8 +8270,11 @@ function toggleDiarioMesDropdown() {
   if (!lista || !wrap) return;
   const aberto = lista.classList.toggle('open');
   wrap.classList.toggle('aberto', aberto);
+  const _mesHojeDT = new Date().getMonth();
+  const _anoHojeDT  = new Date().getFullYear();
   lista.querySelectorAll('.diario-mes-dropdown-item').forEach((el, i) => {
     el.classList.toggle('ativo', i === indice);
+    el.classList.toggle('hoje', i === _mesHojeDT && anoAtual === _anoHojeDT);
   });
 }
 
@@ -7331,6 +8620,104 @@ function confirmarExcluirMeta() {
   init(); draw();
   window._stopSplashCanvas = () => cancelAnimationFrame(raf);
 })();
+
+/* ── AUTH — lógica fictícia (front only) ── */
+
+(function() {
+  const titulo = document.querySelector('#login-panel .auth-titulo');
+  if (titulo) {
+    const temDados = localStorage.length > 0;
+    titulo.textContent = temDados ? 'Bem-vindo de volta!' : 'Bem-vindo!';
+  }
+})();
+
+function _authMostrarPainel(id) {
+  ['login-panel','cadastro-panel','recuperar-panel'].forEach(p => {
+    const el = document.getElementById(p);
+    if (el) el.style.display = 'none';
+  });
+  const target = document.getElementById(id);
+  if (target) {
+    target.style.display = 'flex';
+    target.classList.remove('auth-panel-entering');
+    void target.offsetWidth;
+    target.classList.add('auth-panel-entering');
+  }
+}
+
+function mostrarLogin()          { _authMostrarPainel('login-panel'); }
+function mostrarCadastro()       { _authMostrarPainel('cadastro-panel'); }
+function mostrarRecuperarSenha() { _authMostrarPainel('recuperar-panel'); }
+
+function toggleSenhaVisivel(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const visivel = input.type === 'text';
+  input.type = visivel ? 'password' : 'text';
+  btn.style.color = visivel ? 'rgba(160,185,230,0.4)' : 'rgba(160,185,230,0.9)';
+}
+
+function fazerLogin() {
+  const email = (document.getElementById('login-email')?.value || '').trim();
+  const senha = (document.getElementById('login-senha')?.value || '').trim();
+  if (!email || !senha) {
+    _authErro('login-panel', 'Preencha e-mail e senha para continuar.');
+    return;
+  }
+  fecharSplash();
+}
+
+function fazerCadastro() {
+  const nome  = (document.getElementById('cad-nome')?.value  || '').trim();
+  const email = (document.getElementById('cad-email')?.value || '').trim();
+  const senha = (document.getElementById('cad-senha')?.value || '').trim();
+  if (!nome || !email || !senha) {
+    _authErro('cadastro-panel', 'Preencha todos os campos para criar sua conta.');
+    return;
+  }
+  if (senha.length < 8) {
+    _authErro('cadastro-panel', 'A senha deve ter pelo menos 8 caracteres.');
+    return;
+  }
+  fecharSplash();
+}
+
+function enviarRecuperacao() {
+  const email = (document.getElementById('rec-email')?.value || '').trim();
+  if (!email) {
+    _authErro('recuperar-panel', 'Informe seu e-mail para continuar.');
+    return;
+  }
+  _authSucesso('recuperar-panel', 'Link enviado! Verifique sua caixa de entrada.');
+  setTimeout(() => mostrarLogin(), 2800);
+}
+
+function _authErro(painelId, msg) {
+  const painel = document.getElementById(painelId);
+  if (!painel) return;
+  let el = painel.querySelector('.auth-erro');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'auth-erro';
+    painel.insertBefore(el, painel.querySelector('.auth-btn-primary'));
+  }
+  el.textContent = msg;
+  el.classList.add('visivel');
+  setTimeout(() => el.classList.remove('visivel'), 3500);
+}
+
+function _authSucesso(painelId, msg) {
+  const painel = document.getElementById(painelId);
+  if (!painel) return;
+  let el = painel.querySelector('.auth-sucesso');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'auth-sucesso';
+    painel.insertBefore(el, painel.querySelector('.auth-btn-primary'));
+  }
+  el.textContent = msg;
+  el.classList.add('visivel');
+}
 
 function fecharSplash() {
   const splash = document.getElementById("splash-screen");
@@ -9177,3 +10564,228 @@ function _syncIconesDark(isDark) {
     requestAnimationFrame(apply);
   }
 })();
+/* ══════════════════════════════════════════════════════════════════════
+ *  VISÃO ANUAL
+ * ══════════════════════════════════════════════════════════════════════ */
+
+let _anualAno = new Date().getFullYear();
+let _anualDados = { faturado: [], gastos: [], saldo: [], reserva: [] };
+
+const MESES_CURTOS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function anualNavegar(delta) {
+  _anualAno += delta;
+  anualCarregar();
+}
+
+function anualCarregar() {
+  document.getElementById('anual-titulo-ano').textContent          = _anualAno;
+  document.getElementById('anual-faturado-ano-label').textContent  = _anualAno;
+  document.getElementById('anual-gastos-ano-label').textContent    = _anualAno;
+
+  const faturadoPorMes = [];
+  const gastosPorMes   = [];
+
+  for (let m = 0; m < 12; m++) {
+    const chave = 'planejamento_' + _anualAno + '_' + m;
+    const raw   = localStorage.getItem(chave);
+    if (!raw) { faturadoPorMes.push(0); gastosPorMes.push(0); continue; }
+    let dados = {};
+    try { dados = JSON.parse(raw); } catch(e) { faturadoPorMes.push(0); gastosPorMes.push(0); continue; }
+
+    const sal1 = num(dados.sal1 || '');
+    const sal2 = num(dados.sal2 || '');
+
+    const extrasChave = 'extras_sal_' + _anualAno + '_' + m;
+    const extrasRaw   = localStorage.getItem(extrasChave);
+    let extrasSoma = 0;
+    if (extrasRaw) {
+      try {
+        const extDados = JSON.parse(extrasRaw);
+        [1, 2].forEach(entrada => {
+          const lista   = extDados[String(entrada)] || [];
+          const isSomar = extDados['info' + entrada] !== false;
+          if (isSomar) lista.forEach(e => { extrasSoma += num(e.valor || ''); });
+        });
+      } catch(e) {}
+    }
+    faturadoPorMes.push(sal1 + sal2 + extrasSoma);
+
+    let totalGastos = 0;
+    Object.keys(dados).forEach(k => {
+      if (k.endsWith('_val')) totalGastos += num(dados[k] || '');
+    });
+    gastosPorMes.push(totalGastos);
+  }
+
+  _anualDados.faturado = faturadoPorMes;
+  _anualDados.gastos   = gastosPorMes;
+  _anualDados.saldo    = faturadoPorMes.map((f, i) => f - gastosPorMes[i]);
+
+  // Reserva: lê dep_reserva_ANO_MES para cada mês
+  const reservaPorMes = [];
+  for (let m = 0; m < 12; m++) {
+    const v = parseFloat(localStorage.getItem('dep_reserva_' + _anualAno + '_' + m) || '0');
+    reservaPorMes.push(v);
+  }
+  _anualDados.reserva = reservaPorMes;
+
+  const totalFaturado = faturadoPorMes.reduce((a,b) => a+b, 0);
+  const totalGastos   = gastosPorMes.reduce((a,b) => a+b, 0);
+  const totalSaldo    = totalFaturado - totalGastos;
+  const totalReserva  = reservaPorMes.reduce((a,b) => a+b, 0);
+
+  document.getElementById('anual-faturado-total').textContent  = _anualFmt(totalFaturado);
+  document.getElementById('anual-gastos-total').textContent    = _anualFmt(totalGastos);
+  document.getElementById('anual-saldo-ano-label').textContent = _anualAno;
+  document.getElementById('anual-reserva-ano-label').textContent = _anualAno;
+  document.getElementById('anual-reserva-total').textContent   = _anualFmt(totalReserva);
+
+  const saldoEl = document.getElementById('anual-saldo-total');
+  saldoEl.textContent = _anualFmt(Math.abs(totalSaldo));
+  saldoEl.className = 'anual-widget-total ' + (totalSaldo >= 0 ? 'azul' : 'vermelho-saldo');
+}
+
+function _anualFmt(v) {
+  return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function _anualRenderBars(containerId, valores, cor) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const maxVal    = Math.max(...valores, 1);
+  const mesAtual  = new Date().getMonth();
+  const anoReal   = new Date().getFullYear();
+
+  container.innerHTML = '';
+  valores.forEach((val, i) => {
+    const pct        = Math.max((val / maxVal) * 190, val > 0 ? 8 : 4);
+    const isDestaque = (_anualAno === anoReal && i === mesAtual);
+
+    const col = document.createElement('div');
+    col.className = 'anual-bar-col' + (isDestaque ? ' destaque' : '');
+
+    const labelValor = document.createElement('div');
+    labelValor.className = 'anual-bar-valor';
+    labelValor.textContent = val > 0 ? _anualFmt(val) : '—';
+
+    const track = document.createElement('div');
+    track.className = 'anual-bar-track anual-bar-track--' + (val > 0 ? cor : 'vazio');
+    track.style.height = pct + 'px';
+
+    const labelMes = document.createElement('div');
+    labelMes.className = 'anual-bar-mes';
+    labelMes.textContent = MESES_CURTOS[i];
+
+    col.appendChild(labelValor);
+    col.appendChild(track);
+    col.appendChild(labelMes);
+    container.appendChild(col);
+  });
+}
+
+function anualAbrirPopup(tipo) {
+  if (!_anualDados.faturado.length) anualCarregar();
+  const isFaturado = tipo === 'faturado';
+  const isSaldo    = tipo === 'saldo';
+  const isReserva  = tipo === 'reserva';
+
+  const titulo  = isFaturado ? 'Total Faturado' : isSaldo ? 'Saldo do Período' : isReserva ? 'Reserva Guardada' : 'Total Gasto';
+  const valores = isFaturado ? _anualDados.faturado : isSaldo ? _anualDados.saldo : isReserva ? _anualDados.reserva : _anualDados.gastos;
+  const total   = valores.reduce((a,b) => a+b, 0);
+
+  const iconCor = isFaturado ? '#16a34a' : isSaldo ? '#1c3f91' : isReserva ? '#a16207' : '#dc2626';
+  const iconBg  = isFaturado ? 'rgba(34,197,94,0.12)' : isSaldo ? 'rgba(58,110,220,0.10)' : isReserva ? 'rgba(202,138,4,0.12)' : 'rgba(239,68,68,0.10)';
+  const svgPath = isFaturado
+    ? '<path d="M20 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><circle cx="17.5" cy="13.5" r="1.5" fill="' + iconCor + '" stroke="none"/>'
+    : isSaldo
+    ? '<line x1="12" y1="3" x2="12" y2="20"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="4" y1="7" x2="20" y2="7"/><path d="M4 7 L1 13 Q4 16.5 7 13 Z"/><path d="M20 7 L17 13 Q20 16.5 23 13 Z"/>'
+    : isReserva
+    ? '<rect x="2" y="3" width="20" height="16" rx="2"/><circle cx="12" cy="11" r="3.5"/><circle cx="12" cy="11" r="1.2" fill="' + iconCor + '" stroke="none"/><line x1="7" y1="19" x2="7" y2="21"/><line x1="17" y1="19" x2="17" y2="21"/><line x1="16.5" y1="6.5" x2="19" y2="6.5"/><line x1="16.5" y1="9.5" x2="19" y2="9.5"/>'
+    : '<path d="M4 2v20l3-2 2 2 2-2 2 2 2-2 3 2V2l-3 2-2-2-2 2-2-2-2 2-3-2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/>';
+
+  document.getElementById('anual-popup-titulo').textContent    = titulo;
+  document.getElementById('anual-popup-subtitulo').textContent = 'Ano ' + _anualAno;
+  const totalEl = document.getElementById('anual-popup-total');
+  totalEl.textContent = (isSaldo && total < 0 ? '− ' : '') + _anualFmt(Math.abs(total));
+  const isDark = document.body.classList.contains('dark');
+  totalEl.style.color = isSaldo
+    ? (total >= 0 ? (isDark ? 'rgba(255,255,255,0.92)' : '#0f1f5c') : '#dc2626')
+    : (isDark ? 'rgba(255,255,255,0.92)' : '#0f1f5c');
+
+  const iconEl = document.getElementById('anual-popup-icon');
+  iconEl.style.background = iconBg;
+  iconEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${iconCor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svgPath}</svg>`;
+
+  if (isSaldo) {
+    _anualRenderBarsSaldo('bars-popup', valores);
+  } else {
+    _anualRenderBars('bars-popup', valores, isFaturado ? 'verde' : isReserva ? 'dourado' : 'vermelho');
+  }
+
+  const overlay = document.getElementById('anual-popup-overlay');
+  const popup   = document.getElementById('anual-popup');
+  overlay.style.display = 'block';
+  popup.style.display   = 'block';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      popup.style.opacity   = '1';
+      popup.style.transform = 'translate(-50%,-50%) scale(1)';
+      popup.style.pointerEvents = 'auto';
+    });
+  });
+}
+
+function _anualRenderBarsSaldo(containerId, valores) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const maxAbs   = Math.max(...valores.map(v => Math.abs(v)), 1);
+  const mesAtual = new Date().getMonth();
+  const anoReal  = new Date().getFullYear();
+
+  container.innerHTML = '';
+  valores.forEach((val, i) => {
+    const isPositivo = val >= 0;
+    const pct        = Math.max((Math.abs(val) / maxAbs) * 190, Math.abs(val) > 0 ? 8 : 4);
+    const isDestaque = (_anualAno === anoReal && i === mesAtual);
+
+    const col = document.createElement('div');
+    col.className = 'anual-bar-col' + (isDestaque ? ' destaque' : '');
+
+    const labelValor = document.createElement('div');
+    labelValor.className = 'anual-bar-valor';
+    labelValor.style.color = val === 0 ? '' : isPositivo ? '#1c3f91' : '#c83232';
+    labelValor.textContent = val === 0 ? '—' : (isPositivo ? '' : '− ') + _anualFmt(Math.abs(val));
+
+    const track = document.createElement('div');
+    track.className = 'anual-bar-track anual-bar-track--' + (val === 0 ? 'vazio' : isPositivo ? 'azul' : 'negativo');
+    track.style.height = (val === 0 ? 4 : pct) + 'px';
+
+    const labelMes = document.createElement('div');
+    labelMes.className = 'anual-bar-mes';
+    labelMes.textContent = MESES_CURTOS[i];
+
+    col.appendChild(labelValor);
+    col.appendChild(track);
+    col.appendChild(labelMes);
+    container.appendChild(col);
+  });
+}
+
+function anualFecharPopup() {
+  const overlay = document.getElementById('anual-popup-overlay');
+  const popup   = document.getElementById('anual-popup');
+  popup.style.opacity   = '0';
+  popup.style.transform = 'translate(-50%,-50%) scale(0.95)';
+  popup.style.pointerEvents = 'none';
+  setTimeout(() => {
+    popup.style.display   = 'none';
+    overlay.style.display = 'none';
+  }, 220);
+}
+
+function anualToggleWidget(id) {
+  const widget = document.getElementById('widget-' + id);
+  if (!widget) return;
+  widget.classList.toggle('aberto');
+}

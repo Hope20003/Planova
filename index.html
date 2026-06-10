@@ -72,77 +72,209 @@
   <canvas id="splash-canvas"></canvas>
   <div id="splash-glow-1"></div>
   <div id="splash-glow-2"></div>
-  <div id="splash-card">
-    <div id="splash-icon-wrap">
-      <svg id="splash-icon" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="splash-bgGrad" cx="50%" cy="50%" r="75%" fx="30%" fy="30%">
-            <stop offset="0%" stop-color="#dde2f0"/>
-            <stop offset="100%" stop-color="#c8cfe6"/>
-          </radialGradient>
-          <clipPath id="splash-clip">
-            <rect x="0" y="0" width="680" height="680" rx="148"/>
-          </clipPath>
-          <filter id="splash-shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur in="SourceAlpha" stdDeviation="12"/>
-            <feOffset dx="6" dy="6"/>
-            <feComposite in2="SourceGraphic" operator="over"/>
-          </filter>
-        </defs>
-        <rect width="680" height="680" rx="148" fill="url(#splash-bgGrad)"/>
-        <g clip-path="url(#splash-clip)">
-          <g filter="url(#splash-shadow)" opacity="0.35" clip-path="url(#splash-clip)">
-            <polyline points="65,560 205,380 315,420 415,165 515,230 615,140" fill="none" stroke="#c8d0e8" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Layout split: esquerda = branding, direita = login -->
+  <div id="splash-layout">
+
+    <!-- ── LADO ESQUERDO: branding ── -->
+    <div id="splash-left">
+      <div id="splash-icon-wrap">
+        <svg id="splash-icon" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="splash-bgGrad" cx="50%" cy="50%" r="75%" fx="30%" fy="30%">
+              <stop offset="0%" stop-color="#dde2f0"/>
+              <stop offset="100%" stop-color="#c8cfe6"/>
+            </radialGradient>
+            <clipPath id="splash-clip">
+              <rect x="0" y="0" width="680" height="680" rx="148"/>
+            </clipPath>
+            <filter id="splash-shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="12"/>
+              <feOffset dx="6" dy="6"/>
+              <feComposite in2="SourceGraphic" operator="over"/>
+            </filter>
+          </defs>
+          <rect width="680" height="680" rx="148" fill="url(#splash-bgGrad)"/>
+          <g clip-path="url(#splash-clip)">
+            <g filter="url(#splash-shadow)" opacity="0.35" clip-path="url(#splash-clip)">
+              <polyline points="65,560 205,380 315,420 415,165 515,230 615,140" fill="none" stroke="#c8d0e8" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+            </g>
+            <polyline points="65,560 205,380 315,420 415,165 515,230 615,140" fill="none" stroke="#1e2d5e" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="415" cy="165" r="72" fill="#c8d0e8" opacity="0.35"/>
+            <circle cx="415" cy="165" r="52" fill="#c8d0e8" opacity="0.5"/>
+            <circle cx="415" cy="165" r="38" fill="#1e2d5e"/>
+            <circle cx="415" cy="165" r="24" fill="#3a4a7e"/>
           </g>
-          <polyline points="65,560 205,380 315,420 415,165 515,230 615,140" fill="none" stroke="#1e2d5e" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="415" cy="165" r="72" fill="#c8d0e8" opacity="0.35"/>
-          <circle cx="415" cy="165" r="52" fill="#c8d0e8" opacity="0.5"/>
-          <circle cx="415" cy="165" r="38" fill="#1e2d5e"/>
-          <circle cx="415" cy="165" r="24" fill="#3a4a7e"/>
-        </g>
-      </svg>
-      <div id="splash-icon-ring"></div>
-    </div>
-    <div id="splash-brand">
-      <h1 id="splash-title">Planôva<span id="splash-dot"></span></h1>
-      <p id="splash-tagline">O sistema simples que vale mais do que qualquer planilha.</p>
-    </div>
-    <div id="splash-divider"></div>
-    <div id="splash-features">
-      <div class="splash-feat">
-        <div class="splash-feat-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        </div>
-        <div class="splash-feat-text">
-          <strong>Veja meses à frente</strong>
-          <span>Projeções automáticas antes que o problema chegue.</span>
+        </svg>
+        <div id="splash-icon-ring"></div>
+      </div>
+      <div id="splash-brand">
+        <h1 id="splash-title">Planôva<span id="splash-dot"></span></h1>
+        <p id="splash-tagline">O sistema simples que vale mais do que qualquer planilha.</p>
+        <div id="splash-cards">
+          <div class="splash-card">
+            <div class="splash-card-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="splash-card-text">
+              <strong>Previsão</strong>
+              <span>Veja o futuro antes de enfrentá-lo</span>
+            </div>
+          </div>
+          <div class="splash-card">
+            <div class="splash-card-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <div class="splash-card-text">
+              <strong>Clareza</strong>
+              <span>Nenhum gasto passa despercebido</span>
+            </div>
+          </div>
+          <div class="splash-card">
+            <div class="splash-card-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+            </div>
+            <div class="splash-card-text">
+              <strong>Metas</strong>
+              <span>Transforme sonhos em datas reais</span>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="splash-feat">
-        <div class="splash-feat-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </div>
-        <div class="splash-feat-text">
-          <strong>Cenários reais, decisões melhores</strong>
-          <span>Simule o futuro e escolha o melhor caminho.</span>
-        </div>
-      </div>
-      <div class="splash-feat">
-        <div class="splash-feat-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
-        </div>
-        <div class="splash-feat-text">
-          <strong>Metas com data para acontecer</strong>
-          <span>Reserve, projete e chegue lá com precisão.</span>
-        </div>
-      </div>
+      <span id="splash-version">v1.0</span>
     </div>
-    <button id="splash-btn" onclick="fecharSplash()">
-      <span>Iniciar</span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-    </button>
-    <span id="splash-version">v1.0</span>
-  </div>
+
+    <!-- ── SEPARADOR VERTICAL ── -->
+    <div id="splash-divider-v"></div>
+
+    <!-- ── LADO DIREITO: formulário de login / cadastro ── -->
+    <div id="splash-right">
+
+      <!-- PAINEL LOGIN -->
+      <div id="login-panel" class="auth-panel">
+        <div class="auth-header">
+          <h2 class="auth-titulo">Bem-vindo de volta!</h2>
+          <p class="auth-subtitulo">Entre na sua conta para continuar</p>
+        </div>
+
+        <!-- Google -->
+        <button class="auth-btn-social" onclick="fecharSplash()">
+          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          <span>Continuar com Google</span>
+        </button>
+
+        <div class="auth-or">
+          <span></span>
+          <p>ou entre com e-mail</p>
+          <span></span>
+        </div>
+
+        <div class="auth-field-wrap">
+          <label class="auth-label">E-mail</label>
+          <div class="auth-input-wrap">
+            <svg class="auth-input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <input id="login-email" class="auth-input" type="email" placeholder="seu@email.com" autocomplete="email">
+          </div>
+        </div>
+
+        <div class="auth-field-wrap">
+          <label class="auth-label">Senha</label>
+          <div class="auth-input-wrap">
+            <svg class="auth-input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="login-senha" class="auth-input" type="password" placeholder="••••••••" autocomplete="current-password">
+            <button class="auth-toggle-senha" onclick="toggleSenhaVisivel('login-senha', this)" tabindex="-1">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <button class="auth-link-inline" onclick="mostrarRecuperarSenha()">Esqueci minha senha</button>
+        </div>
+
+        <button class="auth-btn-primary" onclick="fazerLogin()">
+          <span>Entrar</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+
+        <p class="auth-footer-text">Não tem conta? <button class="auth-link" onclick="mostrarCadastro()">Criar conta grátis</button></p>
+      </div>
+
+      <!-- PAINEL CADASTRO -->
+      <div id="cadastro-panel" class="auth-panel" style="display:none;">
+        <div class="auth-header">
+          <h2 class="auth-titulo">Criar conta</h2>
+          <p class="auth-subtitulo">Grátis para sempre. Sem cartão.</p>
+        </div>
+
+        <button class="auth-btn-social" onclick="fecharSplash()">
+          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          <span>Cadastrar com Google</span>
+        </button>
+
+        <div class="auth-or">
+          <span></span>
+          <p>ou cadastre com e-mail</p>
+          <span></span>
+        </div>
+
+        <div class="auth-field-wrap">
+          <label class="auth-label">Nome completo</label>
+          <div class="auth-input-wrap">
+            <svg class="auth-input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input id="cad-nome" class="auth-input" type="text" placeholder="Seu nome" autocomplete="name">
+          </div>
+        </div>
+
+        <div class="auth-field-wrap">
+          <label class="auth-label">E-mail</label>
+          <div class="auth-input-wrap">
+            <svg class="auth-input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <input id="cad-email" class="auth-input" type="email" placeholder="seu@email.com" autocomplete="email">
+          </div>
+        </div>
+
+        <div class="auth-field-wrap">
+          <label class="auth-label">Senha</label>
+          <div class="auth-input-wrap">
+            <svg class="auth-input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="cad-senha" class="auth-input" type="password" placeholder="Mín. 8 caracteres" autocomplete="new-password">
+            <button class="auth-toggle-senha" onclick="toggleSenhaVisivel('cad-senha', this)" tabindex="-1">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <button class="auth-btn-primary" onclick="fazerCadastro()">
+          <span>Criar minha conta</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+
+        <p class="auth-footer-text">Já tem conta? <button class="auth-link" onclick="mostrarLogin()">Entrar</button></p>
+      </div>
+
+      <!-- PAINEL RECUPERAR SENHA -->
+      <div id="recuperar-panel" class="auth-panel" style="display:none;">
+        <div class="auth-header">
+          <h2 class="auth-titulo">Recuperar senha</h2>
+          <p class="auth-subtitulo">Enviaremos um link para o seu e-mail</p>
+        </div>
+
+        <div class="auth-field-wrap" style="margin-top:8px;">
+          <label class="auth-label">E-mail cadastrado</label>
+          <div class="auth-input-wrap">
+            <svg class="auth-input-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <input id="rec-email" class="auth-input" type="email" placeholder="seu@email.com" autocomplete="email">
+          </div>
+        </div>
+
+        <button class="auth-btn-primary" onclick="enviarRecuperacao()">
+          <span>Enviar link</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+        </button>
+
+        <p class="auth-footer-text"><button class="auth-link" onclick="mostrarLogin()">← Voltar ao login</button></p>
+      </div>
+
+    </div><!-- fim splash-right -->
+  </div><!-- fim splash-layout -->
 </div>
 
 
@@ -188,8 +320,9 @@
     </div>
     <h2>Planôva<span class="planova-dot"></span></h2>
     <div class="topnav-tabs">
-      <button class="topnav-tab ativo" id="tab-planejamento" onclick="mudarAba('planejamento')">Mensal</button>
-      <button class="topnav-tab" id="tab-diario" onclick="mudarAba('diario')">Diário</button>
+      <button class="topnav-tab ativo" id="tab-planejamento" onclick="mudarAba('planejamento')">Mensal<span class="tab-indicator"></span></button>
+      <button class="topnav-tab" id="tab-diario" onclick="mudarAba('diario')">Diário<span class="tab-indicator"></span></button>
+      <button class="topnav-tab" id="tab-anual" onclick="mudarAba('anual')">Anual<span class="tab-indicator"></span></button>
     </div>
   </div>
   <div class="topnav-right">
@@ -273,9 +406,10 @@
     <div class="secao">
       <div class="secao-header" style="display:flex;align-items:center;">
         <div class="sal-input-wrap" id="sal1-wrap">
-          <input class="salario-input" id="sal1" type="text" placeholder="R$ 0,00" autocomplete="off" oninput="fmtInput(this)" onblur="fmt(this)" onkeydown="if(event.key==='Enter')confirmarSalario()">
+          <input class="salario-input" id="sal1" type="text" placeholder="R$ 0,00" autocomplete="off" oninput="fmtInput(this)" onblur="fmt(this)" >
           <button id="sal1-enter" class="btn-confirmar-sal" onclick="confirmarSalario()">↵</button>
-          <button class="btn-limpar-linha" onclick="document.getElementById('sal1').value='';confirmarSalario()">×<span class="limpar-tooltip">Limpar salário</span></button>
+          <button class="btn-limpar-linha" onclick="limparEntradaSal(1)">×<span class="limpar-tooltip">Limpar salário</span></button>
+          <button class="btn-extras-sal" onclick="toggleExtrasSal(1)" id="btn-extras-sal1">+<span class="replicar-tooltip">Entradas extras</span></button>
         </div>
       </div>
       <div class="secao-e-subtotal">
@@ -286,6 +420,11 @@
       <div class="bloco-header-wrap" id="wrap-tot1-res"><h3>Residência</h3><span class="bloco-gaveta" onclick="toggleBlocoValor('tot1-res')" id="gav-tot1-res">R$ 0,00</span></div>
       <div class="bloco-wrap-inner">
         <div class="bloco">
+          <div class="linha">
+          <select autocomplete="off" onchange="recalc(false,true)"><option value="">Selecione</option><option>Internet</option><option>Água</option><option>Energia</option><option>Aluguel</option><option>Financiamento</option><option>Condomínio</option><option>IPTU</option></select>
+          <input class="val-input" type="text" placeholder="R$ 0,00" oninput="fmtInput(this)" onkeydown="if(event.key==='Enter'){this._enterPressed=true;fmt(this);recalc(false,true);verificarDuplicataLinha(this);this.blur()}" onblur="if(this._enterPressed){this._enterPressed=false;fmt(this);}else{fmt(this);recalc(false,true);verificarDuplicataLinha(this);}" autocomplete="off">
+          <input type="checkbox" onchange="recalc(false,true)">
+        </div>
           <div class="linha">
           <select autocomplete="off" onchange="recalc(false,true)"><option value="">Selecione</option><option>Internet</option><option>Água</option><option>Energia</option><option>Aluguel</option><option>Financiamento</option><option>Condomínio</option><option>IPTU</option></select>
           <input class="val-input" type="text" placeholder="R$ 0,00" oninput="fmtInput(this)" onkeydown="if(event.key==='Enter'){this._enterPressed=true;fmt(this);recalc(false,true);verificarDuplicataLinha(this);this.blur()}" onblur="if(this._enterPressed){this._enterPressed=false;fmt(this);}else{fmt(this);recalc(false,true);verificarDuplicataLinha(this);}" autocomplete="off">
@@ -388,9 +527,10 @@
     <div class="secao">
       <div class="secao-header" style="display:flex;align-items:center;">
         <div class="sal-input-wrap" id="sal2-wrap">
-          <input class="salario-input" id="sal2" type="text" placeholder="R$ 0,00" autocomplete="off" oninput="fmtInput(this)" onblur="fmt(this)" onkeydown="if(event.key==='Enter')confirmarSalario()">
+          <input class="salario-input" id="sal2" type="text" placeholder="R$ 0,00" autocomplete="off" oninput="fmtInput(this)" onblur="fmt(this)" >
           <button id="sal2-enter" class="btn-confirmar-sal" onclick="confirmarSalario()">↵</button>
-          <button class="btn-limpar-linha" onclick="document.getElementById('sal2').value='';confirmarSalario()">×<span class="limpar-tooltip">Limpar salário</span></button>
+          <button class="btn-limpar-linha" onclick="limparEntradaSal(2)">×<span class="limpar-tooltip">Limpar salário</span></button>
+          <button class="btn-extras-sal" onclick="toggleExtrasSal(2)" id="btn-extras-sal2">+<span class="replicar-tooltip">Entradas extras</span></button>
         </div>
       </div>
       <div class="secao-e-subtotal">
@@ -401,6 +541,11 @@
       <div class="bloco-header-wrap" id="wrap-tot2-res"><h3>Residência</h3><span class="bloco-gaveta" onclick="toggleBlocoValor('tot2-res')" id="gav-tot2-res">R$ 0,00</span></div>
       <div class="bloco-wrap-inner">
         <div class="bloco">
+          <div class="linha">
+          <select autocomplete="off" onchange="recalc(false,true)"><option value="">Selecione</option><option>Internet</option><option>Água</option><option>Energia</option><option>Aluguel</option><option>Financiamento</option><option>Condomínio</option><option>IPTU</option></select>
+          <input class="val-input" type="text" placeholder="R$ 0,00" oninput="fmtInput(this)" onkeydown="if(event.key==='Enter'){this._enterPressed=true;fmt(this);recalc(false,true);verificarDuplicataLinha(this);this.blur()}" onblur="if(this._enterPressed){this._enterPressed=false;fmt(this);}else{fmt(this);recalc(false,true);verificarDuplicataLinha(this);}" autocomplete="off">
+          <input type="checkbox" onchange="recalc(false,true)">
+        </div>
           <div class="linha">
           <select autocomplete="off" onchange="recalc(false,true)"><option value="">Selecione</option><option>Internet</option><option>Água</option><option>Energia</option><option>Aluguel</option><option>Financiamento</option><option>Condomínio</option><option>IPTU</option></select>
           <input class="val-input" type="text" placeholder="R$ 0,00" oninput="fmtInput(this)" onkeydown="if(event.key==='Enter'){this._enterPressed=true;fmt(this);recalc(false,true);verificarDuplicataLinha(this);this.blur()}" onblur="if(this._enterPressed){this._enterPressed=false;fmt(this);}else{fmt(this);recalc(false,true);verificarDuplicataLinha(this);}" autocomplete="off">
@@ -578,11 +723,13 @@
                   <span class="meta-card-counter" id="meta-card-counter">1/1</span>
                   <button class="meta-card-nav-btn" id="meta-nav-next" onclick="navegarMeta(1)" title="Próxima">›</button>
                 </div>
-                <button class="res-lapis-btn" onclick="editarMetaAtiva()" title="Editar meta">
+                <button class="res-lapis-btn" onclick="editarMetaAtiva()">
                   <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  <span class="lapis-tooltip lapis-tooltip-center">Editar meta</span>
                 </button>
-                <button class="res-delete-btn" onclick="abrirPopupConfirmarExcluirMeta()" title="Excluir esta meta">
+                <button class="res-delete-btn" onclick="abrirPopupConfirmarExcluirMeta()">
                   <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                  <span class="meta-delete-tooltip">Excluir meta</span>
                 </button>
               </div>
             </div>
@@ -1401,6 +1548,165 @@
   </div>
 </div>
 
+<!-- ══ TELA ANUAL ══ -->
+<div id="view-anual" style="display:none;">
+  <div class="anual-container">
+    <div class="anual-header-row">
+      <h2 class="anual-titulo">Visão Geral</h2>
+      <div class="anual-ano-nav">
+        <button class="btn-mes" onclick="anualNavegar(-1)">&#10094;</button>
+        <span id="anual-titulo-ano" class="anual-ano-label">2026</span>
+        <button class="btn-mes" onclick="anualNavegar(1)">&#10095;</button>
+      </div>
+    </div>
+
+    <div class="anual-grid">
+
+      <!-- Card Faturado -->
+      <div class="anual-widget" id="widget-faturado" onclick="anualAbrirPopup('faturado')">
+        <div class="anual-widget-icon anual-widget-icon--verde">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+            <circle cx="17.5" cy="13.5" r="1.5" fill="currentColor" stroke="none"/>
+          </svg>
+        </div>
+        <div class="anual-widget-label">Total Faturado</div>
+        <div class="anual-widget-total verde" id="anual-faturado-total">R$ 0,00</div>
+        <div class="anual-widget-desc">Salário bruto em <span id="anual-faturado-ano-label">2026</span></div>
+        <div class="anual-widget-cta">Ver detalhes →</div>
+      </div>
+
+      <!-- Card Gastos -->
+      <div class="anual-widget" id="widget-gastos" onclick="anualAbrirPopup('gastos')">
+        <div class="anual-widget-icon anual-widget-icon--vermelho">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 2v20l3-2 2 2 2-2 2 2 2-2 3 2V2l-3 2-2-2-2 2-2-2-2 2-3-2z"/>
+            <line x1="8" y1="9" x2="16" y2="9"/>
+            <line x1="8" y1="13" x2="16" y2="13"/>
+            <line x1="8" y1="17" x2="12" y2="17"/>
+          </svg>
+        </div>
+        <div class="anual-widget-label">Total Gasto</div>
+        <div class="anual-widget-total vermelho" id="anual-gastos-total">R$ 0,00</div>
+        <div class="anual-widget-desc">Gastos brutos em <span id="anual-gastos-ano-label">2026</span></div>
+        <div class="anual-widget-cta">Ver detalhes →</div>
+      </div>
+
+      <!-- Card Saldo -->
+      <div class="anual-widget" id="widget-saldo" onclick="anualAbrirPopup('saldo')">
+        <div class="anual-widget-icon anual-widget-icon--azul">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="3" x2="12" y2="20"/>
+            <line x1="8" y1="20" x2="16" y2="20"/>
+            <line x1="4" y1="7" x2="20" y2="7"/>
+            <path d="M4 7 L1 13 Q4 16.5 7 13 Z"/>
+            <path d="M20 7 L17 13 Q20 16.5 23 13 Z"/>
+          </svg>
+        </div>
+        <div class="anual-widget-label">Saldo do Período</div>
+        <div class="anual-widget-total azul" id="anual-saldo-total">R$ 0,00</div>
+        <div class="anual-widget-desc">Entrada menos gastos em <span id="anual-saldo-ano-label">2026</span></div>
+        <div class="anual-widget-cta">Ver detalhes →</div>
+      </div>
+
+      <!-- Card Reserva -->
+      <div class="anual-widget" id="widget-reserva" onclick="anualAbrirPopup('reserva')">
+        <div class="anual-widget-icon anual-widget-icon--dourado">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="16" rx="2"/>
+            <circle cx="12" cy="11" r="3.5"/>
+            <circle cx="12" cy="11" r="1.2" fill="currentColor" stroke="none"/>
+            <line x1="7" y1="19" x2="7" y2="21"/>
+            <line x1="17" y1="19" x2="17" y2="21"/>
+            <line x1="16.5" y1="6.5" x2="19" y2="6.5"/>
+            <line x1="16.5" y1="9.5" x2="19" y2="9.5"/>
+          </svg>
+        </div>
+        <div class="anual-widget-label">Reserva Guardada</div>
+        <div class="anual-widget-total dourado" id="anual-reserva-total">R$ 0,00</div>
+        <div class="anual-widget-desc">Depósitos na reserva em <span id="anual-reserva-ano-label">2026</span></div>
+        <div class="anual-widget-cta">Ver detalhes →</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══ POPUP GRÁFICO ANUAL ══ -->
+<div id="anual-popup-overlay" onclick="anualFecharPopup()" style="display:none;position:fixed;inset:0;background:rgba(10,21,64,0.5);z-index:10100;backdrop-filter:blur(4px);"></div>
+<div id="anual-popup" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.95);z-index:10101;width:90vw;max-width:860px;background:#fff;border-radius:20px;border:1.5px solid #a8c4f0;box-shadow:0 12px 48px rgba(28,63,145,0.18);padding:0;opacity:0;transition:opacity 0.22s ease,transform 0.22s ease;pointer-events:none;overflow:hidden;">
+  <div class="anual-popup-header">
+    <div class="anual-popup-header-left">
+      <div class="anual-popup-icon" id="anual-popup-icon"></div>
+      <div>
+        <div class="anual-popup-titulo" id="anual-popup-titulo">Total Faturado</div>
+        <div class="anual-popup-subtitulo" id="anual-popup-subtitulo">2026</div>
+      </div>
+    </div>
+    <div class="anual-popup-total" id="anual-popup-total">R$ 0,00</div>
+    <button class="anual-popup-fechar" onclick="anualFecharPopup()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="anual-popup-body">
+    <div class="anual-chart-wrap">
+      <div class="anual-bars" id="bars-popup"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ POPUP GERENCIAR CATEGORIAS ══ -->
+<div id="popup-categorias-overlay" onclick="fecharPopupCategorias()" style="display:none;position:fixed;inset:0;background:rgba(10,21,64,0.38);z-index:10014;backdrop-filter:blur(2px);"></div>
+<div id="popup-categorias" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.94);z-index:10015;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.18);padding:26px 24px 22px;width:360px;max-width:94vw;opacity:0;transition:opacity 0.2s ease,transform 0.2s ease;pointer-events:none;">
+  <div class="popup-cat-header">
+    <div class="popup-cat-titulo-wrap">
+      <div>
+        <div class="popup-cat-titulo">Categorias cadastradas</div>
+        <div id="popup-cat-subtitulo" class="popup-cat-subtitulo">Residencia</div>
+      </div>
+    </div>
+    <button onclick="fecharPopupCategorias()" class="popup-cat-fechar">&#x2715;</button>
+  </div>
+  <div id="popup-cat-lista" class="popup-cat-lista"></div>
+  <div id="popup-cat-form" class="popup-cat-form" style="display:none;">
+    <div class="popup-cat-form-titulo" id="popup-cat-form-titulo">Nova categoria</div>
+    <input id="popup-cat-nome" class="popup-cat-input" type="text" placeholder="Nome da categoria" maxlength="24" autocomplete="off">
+    <div class="popup-cat-cores-wrap">
+      <div class="popup-cat-cor-grupo">
+        <label class="popup-cat-cor-label">Fundo</label>
+        <div class="popup-cat-swatch" id="swatch-bg" onclick="abrirCatPicker('bg')" style="background:#215a6c;"></div>
+        <input id="popup-cat-cor-bg" class="popup-cat-cor-input" type="color" value="#215a6c">
+      </div>
+      <div class="popup-cat-cor-grupo">
+        <label class="popup-cat-cor-label">Texto</label>
+        <div class="popup-cat-swatch" id="swatch-text" onclick="abrirCatPicker('text')" style="background:#ffffff;box-shadow:0 0 0 2px #dde3f0,0 4px 12px rgba(28,63,145,0.13);"></div>
+        <input id="popup-cat-cor-text" class="popup-cat-cor-input" type="color" value="#ffffff">
+      </div>
+      <div class="popup-cat-preview-wrap">
+        <label class="popup-cat-cor-label">Preview</label>
+        <div id="popup-cat-preview" class="popup-cat-preview">Nome</div>
+      </div>
+    </div>
+    <div class="popup-cat-form-btns">
+      <button class="popup-cat-btn-cancel" onclick="fecharFormCategoria()">Cancelar</button>
+      <button class="popup-cat-btn-save" onclick="salvarCategoria()">Salvar</button>
+    </div>
+  </div>
+  <button id="popup-cat-btn-add" class="popup-cat-btn-add" onclick="abrirFormCategoria()">+ Nova categoria</button>
+</div>
+
+<!-- ── COLOR PICKER CUSTOMIZADO ── -->
+<div id="cat-color-picker-overlay" onclick="fecharCatPicker()"></div>
+<div id="cat-color-picker">
+  <canvas id="cat-cp-canvas" width="224" height="160"></canvas>
+  <input id="cat-cp-hue" type="range" min="0" max="360" value="180">
+  <div class="cat-cp-row">
+    <div id="cat-cp-swatch-preview"></div>
+    <input id="cat-cp-hex" type="text" maxlength="7" spellcheck="false" placeholder="#000000">
+  </div>
+</div>
+
 <!-- ══ POPUP CONFIRMAR EXCLUIR META ══ -->
 <div id="popup-excluir-meta-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,21,64,0.38);z-index:10002;backdrop-filter:blur(2px);"></div>
 <div id="popup-excluir-meta" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.94);z-index:10003;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.22);padding:26px 28px 22px;width:320px;max-width:94vw;text-align:center;opacity:0;transition:opacity 0.2s ease,transform 0.2s ease;pointer-events:none;">
@@ -1556,6 +1862,29 @@
 
 
 <div id="tour-bloqueador" style="display:none;position:fixed;inset:0;z-index:49998;pointer-events:all;"></div>
+
+<!-- ── POPOVER ENTRADAS EXTRAS ── -->
+<div id="extras-sal-popover">
+  <div class="extras-sal-pop-header">
+    <span class="extras-sal-pop-titulo">Entradas extras</span>
+    <button class="extras-sal-pop-fechar" onclick="fecharExtrasSal()">×</button>
+  </div>
+  <div class="extras-sal-info-wrap">
+    <div class="extras-sal-info-texto">
+      <span class="extras-sal-info-label">Somar ao salário</span>
+      <span class="extras-sal-info-desc">Inclui no total da entrada</span>
+    </div>
+    <div class="extras-sal-toggle-track" id="extras-sal-toggle-track" onclick="toggleExtrasSalInfo()">
+      <div class="extras-sal-toggle-thumb" id="extras-sal-toggle-thumb"></div>
+    </div>
+  </div>
+  <div class="extras-sal-base-wrap" id="extras-sal-base-wrap">
+    <span class="extras-sal-base-label">Salário base</span>
+    <input type="text" class="extras-sal-base-input" id="extras-sal-base-input" placeholder="R$ 0,00" autocomplete="off">
+  </div>
+  <div class="extras-sal-lista" id="extras-sal-lista"></div>
+  <button class="extras-sal-add-btn" onclick="adicionarExtraSal(_extrasEntradaAtiva)">+ Nova entrada</button>
+</div>
 
 </body>
 </html>
