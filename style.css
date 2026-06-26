@@ -401,6 +401,38 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     pointer-events: all;
   }
 
+  #popup-replicar-sal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.38);
+    z-index: 9998;
+    backdrop-filter: blur(2px);
+  }
+  #popup-replicar-sal-overlay.visivel { display: block; }
+  #popup-replicar-sal {
+    display: none;
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.92);
+    z-index: 9999;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.22);
+    padding: 28px 32px 24px;
+    width: 360px;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+  }
+  #popup-replicar-sal.visivel {
+    display: block;
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: all;
+  }
+
 
 
   /* ── LAYOUT PRINCIPAL ── */
@@ -417,6 +449,331 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
   width: 100%;
   box-sizing: border-box;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   PERFIL ÚNICO — usuário com uma única entrada de renda
+   Esconde coluna 2 (sal2 travado em 0 pelo JS) e reorganiza o
+   layout: 3 blocos lado a lado, previsões como cards grandes
+   embaixo, painel direita reduzido (reserva + metas).
+   Nenhum elemento é removido do DOM — só reposicionado via grid,
+   preservando todos os ids/handlers usados pelo motor de cálculo.
+   ══════════════════════════════════════════════════════════════ */
+
+body.perfil-unico #coluna2-wrapper {
+  display: none !important;
+}
+body.perfil-unico .main-layout > .separador {
+  display: none !important;
+}
+
+body.perfil-unico .main-layout {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr 260px;
+  grid-template-rows: auto auto;
+  gap: 14px;
+  padding: 14px 16px 24px;
+  align-items: start;
+}
+
+/* Coluna 1 vira o conjunto dos 3 blocos. Ocupa as 4 colunas do grid
+   (igual à linha de previsão/reserva embaixo) para não deixar a
+   coluna da reserva (260px) vazia nesta linha — ver .blocos-area
+   abaixo para como esse espaço extra é distribuído. */
+body.perfil-unico #coluna1-wrapper {
+  display: block !important;
+  grid-column: 1 / 5;
+  grid-row: 1;
+  width: 100%;
+}
+body.perfil-unico #coluna1-wrapper .secao { width: 100%; }
+body.perfil-unico #coluna1-wrapper .secao-e-subtotal {
+  width: 100%;
+  gap: 0;
+}
+/* Em vez de 3 colunas de grid em "1fr" (que jogariam TODO o espaço
+   extra para dentro da largura dos blocos), usamos flex com um teto
+   de largura por bloco + justify-content: space-between. Resultado:
+   os blocos crescem um pouco (até o teto) e o restante do espaço
+   sobra distribuído de forma simétrica entre eles — sem espaço morto
+   à direita e sem blocos esticados demais. */
+body.perfil-unico #coluna1-wrapper .blocos-area {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 100px; /* respiro mínimo — também o suficiente para a gaveta de total abrir (90px) sem cortar no bloco vizinho */
+  width: 100%;
+  padding-right: 100px; /* o último bloco (Outros) não tem vizinho à direita — precisa do mesmo respiro */
+  box-sizing: border-box;
+}
+/* Sem subtotal no perfil único */
+body.perfil-unico #coluna1-wrapper .subtotal-area {
+  display: none !important;
+}
+
+/* Cada bloco cresce de forma flexível, mas com um teto — evita que
+   vire a única válvula de escape do espaço extra (o respiro entre
+   eles é que absorve o restante, via justify-content acima). */
+body.perfil-unico .bloco-wrap {
+  flex: 1 1 0;
+  max-width: 440px;
+  min-width: 0;
+}
+body.perfil-unico .bloco-header-wrap,
+body.perfil-unico .bloco-header-wrap > h3,
+body.perfil-unico .bloco-wrap > h3,
+body.perfil-unico .bloco {
+  width: 100% !important;
+}
+body.perfil-unico .bloco-wrap { margin-bottom: 0 !important; }
+
+/* Separadores entre Residência/Cartões/Outros, injetados via JS
+   (_aplicarPerfilRenda). Mesma classe .separador usada entre colunas —
+   aqui só zeramos a margem inline porque o espaçamento já vem do gap
+   do .blocos-area (flex), evitando dobrar o respiro. */
+body.perfil-unico .blocos-area > .separador {
+  margin: 0;
+}
+body.perfil-unico .bloco-wrap-inner { gap: 0; }
+/* Gaveta de total ancorada à direita do bloco (mesma lógica, só sem px fixo) */
+body.perfil-unico .bloco-gaveta { left: calc(100% - 85px); }
+body.perfil-unico .bloco-header-wrap:not(.aberto):hover .bloco-gaveta { left: calc(100% - 58px); }
+body.perfil-unico .bloco-header-wrap.aberto .bloco-gaveta { left: 100%; }
+
+/* ── Painel direita ──
+   O painel-direita original é escondido por completo. Seus filhos
+   relevantes (previsões, reserva, metas) são MOVIDOS via JS
+   (appendChild) para dentro de #pu-grid-extra, que é a célula real
+   do grid responsável por essas posições. appendChild preserva o
+   nó inteiro — ids, listeners, estado — só muda a posição no DOM.
+   Essa abordagem é mais robusta que display:contents. */
+body.perfil-unico .painel-direita {
+  display: none !important;
+}
+
+#pu-grid-extra {
+  display: none;
+}
+/* REDESENHO (jun/2026): em vez de "previsão ao lado de uma sidebar",
+   #pu-grid-extra agora empilha 2 painéis full-bleed — Saldo+Gastos
+   (peso alto) acima, Reserva+Meta (peso baixo) abaixo. Cada painel é
+   UM bloco único com divisória interna, não dois cards soltos — isso
+   garante que os dois lados de cada par tenham o mesmo peso visual
+   por construção (são literalmente as duas metades do mesmo painel),
+   e a hierarquia entre os pares vem da altura/tipografia do painel,
+   não de inflar o tamanho de um card pra preencher espaço. */
+body.perfil-unico #pu-grid-extra {
+  display: flex;
+  flex-direction: column;
+  grid-column: 1 / 5;
+  grid-row: 2;
+  gap: 14px;
+  width: 100%;
+  /* Mesmo respiro à direita usado em .blocos-area (linha de cima), pra
+     os painéis terminarem na mesma borda direita que o bloco "Outros". */
+  padding-right: 100px;
+  box-sizing: border-box;
+}
+
+/* ── Saldo + Gastos: dois cards de verdade, com espaço entre eles ──
+   Tentativa anterior fundia os dois num retângulo só com linha no
+   meio — visualmente lê como "card esticado e cortado", não como
+   duas coisas. Agora são dois elementos de fato, cada um com sua
+   própria borda/sombra/canto — o peso igual vem de serem estilizados
+   de forma idêntica (mesma largura via flex, mesma tipografia), não
+   de serem literalmente a mesma caixa. */
+body.perfil-unico #pu-cards-principais {
+  display: flex;
+  width: 100%;
+  gap: 16px;
+  box-sizing: border-box;
+}
+body.perfil-unico #pu-cards-principais .previsao-card {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0 !important;
+  border: 1.5px solid #dce6f8;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(28,63,145,0.10);
+  padding: 24px 20px;
+}
+/* Sem ::before override aqui — mantém o mesmo glow azul sutil que o
+   painel-direita do perfil 2x já usa (radial-gradient definido na
+   regra base .previsao-card::before), em vez de fundo tingido
+   verde/vermelho inventado. A mesma coloração nos dois cards, igual
+   ao 2x. */
+body.perfil-unico #pu-cards-principais .previsao-card-titulo {
+  font-size: 10.5px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+/* Ícone por métrica — decorativo, mesma cor de marca (azul) nos dois,
+   sem variar por verde/vermelho — só o valor numérico (que já tem
+   essa lógica própria, intocada) carrega a cor semântica. */
+body.perfil-unico #pu-cards-principais .previsao-card-titulo::before {
+  content: "";
+  width: 13px; height: 13px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a6edc' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='4' y1='20' x2='4' y2='14'/%3E%3Cline x1='12' y1='20' x2='12' y2='9'/%3E%3Cline x1='20' y1='20' x2='20' y2='4'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+body.perfil-unico #pu-cards-principais .previsao-card-valor {
+  font-size: 30px;
+  margin-bottom: 5px;
+}
+body.perfil-unico #pu-cards-principais .previsao-card-pct {
+  font-size: 13px;
+}
+
+/* ── Reserva + Meta: mesma lógica — dois cards separados, peso visual
+   menor (cards mais baixos, números menores) por serem informação
+   secundária em relação às previsões. Sem fundo tingido — branco puro
+   igual ao painel-direita do perfil 2x. */
+body.perfil-unico #pu-sidebar {
+  display: flex;
+  width: 100%;
+  gap: 16px;
+  box-sizing: border-box;
+}
+body.perfil-unico #pu-sidebar .reserva-card,
+body.perfil-unico #pu-sidebar .metas-reserva-card-outer {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0 !important;
+  border: 1.5px solid #dce6f8;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(28,63,145,0.10);
+  min-height: 0;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+body.perfil-unico #pu-sidebar .reserva-card {
+  align-items: center;
+  text-align: center;
+}
+
+/* Reserva: sem barra/anel — não existe meta configurável pra ela,
+   só valor acumulado + ações. Compacta o cabeçalho e o valor pra
+   caber no painel mais baixo. */
+body.perfil-unico #pu-sidebar .reserva-card-header {
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+body.perfil-unico #pu-sidebar .reserva-card-titulo {
+  font-size: 10.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+body.perfil-unico #pu-sidebar .reserva-card-titulo::before {
+  content: "";
+  width: 13px; height: 13px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a6edc' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2 4 5v6c0 5 3.5 8.5 8 11 4.5-2.5 8-6 8-11V5z'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+body.perfil-unico #pu-sidebar .reserva-card-saldo {
+  font-size: 19px;
+  padding: 2px 0 8px;
+}
+body.perfil-unico #pu-sidebar .reserva-card-btns {
+  max-width: 230px;
+  width: 100%;
+}
+
+/* Meta: troca a barra linear (faz sentido pra ela, já que tem um
+   alvo) por um anel — mais direto pra "% até um valor" — e remove a
+   pilha decorativa de cards atrás (puramente visual, sem função; a
+   navegação real continua pelas setas/contador). */
+body.perfil-unico #meta-stack-s1,
+body.perfil-unico #meta-stack-s2 {
+  display: none !important;
+}
+body.perfil-unico .reserva-prog-pct {
+  display: none; /* redundante com o % visual do anel */
+}
+body.perfil-unico .reserva-prog-track {
+  display: none;
+}
+body.perfil-unico .meta-ring-wrap {
+  display: flex !important;
+  order: 2;
+  flex-shrink: 0;
+}
+body.perfil-unico .meta-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+  width: 100%;
+}
+body.perfil-unico .meta-card-header {
+  order: 1;
+  width: 100%;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+body.perfil-unico .meta-card-nome {
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #8a9cc8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+body.perfil-unico .meta-card-nome::before {
+  content: "";
+  width: 13px; height: 13px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a6edc' stroke-width='2.3'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='5'/%3E%3Ccircle cx='12' cy='12' r='1.4' fill='%233a6edc' stroke='none'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+body.perfil-unico .reserva-prog-valores {
+  order: 3;
+  margin-top: 0 !important;
+}
+body.perfil-unico .reserva-prog-atual {
+  font-size: 16px;
+}
+body.perfil-unico #pu-sidebar .reserva-card-btns,
+body.perfil-unico .metas-reserva-card-outer .reserva-card-btns {
+  margin-top: 8px !important;
+}
+body.perfil-unico .metas-reserva-card-outer .reserva-card-btns {
+  order: 4;
+  width: 100%;
+}
+body.perfil-unico #pu-sidebar .reserva-card-btn {
+  font-size: 9.5px;
+  padding: 4px 0;
+}
+/* Estado vazio (sem meta cadastrada) — vira linha horizontal compacta
+   em vez do card vertical original, pra caber na metade do painel. */
+body.perfil-unico .meta-vazio-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+body.perfil-unico .meta-vazio-icone {
+  width: 40px;
+  height: 30px;
+}
+body.perfil-unico .meta-vazio-texto {
+  text-align: left;
+  font-size: 10.5px;
+}
+
+
 
   /* ── COLUNA WRAPPER (secao + subtotal lado a lado) ── */
 .coluna-wrapper {
@@ -520,6 +877,70 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     align-items: center;
     gap: 4px;
   }
+
+  /* ── MENU ⋯ DO SALÁRIO ── */
+  .sal-menu-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .btn-sal-menu {
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: none;
+    color: #bbc8e0;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
+    padding: 0;
+  }
+  .btn-sal-menu:hover { color: #1c3f91; background: rgba(58,110,220,0.1); }
+  .sal-menu-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    border: 1.5px solid #dce6f8;
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(28,63,145,0.14);
+    padding: 4px;
+    min-width: 148px;
+    z-index: 9999;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sal-menu-dropdown.aberto { display: flex; }
+  .sal-menu-dropdown button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: none;
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 500;
+    color: #1a2a5e;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.12s, color 0.12s;
+  }
+  .sal-menu-dropdown button:hover { background: #f0f4fb; }
+  .sal-menu-dropdown button svg { flex-shrink: 0; color: #8a9cc8; }
+  .sal-menu-dropdown button.sal-menu-danger { color: #c0392b; }
+  .sal-menu-dropdown button.sal-menu-danger svg { color: #c0392b; }
+  .sal-menu-dropdown button.sal-menu-danger:hover { background: #fef2f2; }
+  body.mes-fechado .sal-menu-wrap { display: none; }
 
   
 
@@ -1701,6 +2122,10 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     justify-content: flex-end;
     margin-top: 4px;
   }
+  #popup-replicar-sal .replicar-btns {
+    flex-direction: column;
+    align-items: stretch;
+  }
   .btn-replicar-cancelar {
     border: 1.5px solid #e0e6f4;
     background: none;
@@ -1728,6 +2153,11 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     transition: opacity 0.15s;
   }
   .btn-replicar-confirmar:hover { opacity: 0.88; }
+  .btn-replicar-confirmar.bloqueado {
+    opacity: 0.25;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
   .replicar-aviso {
     font-size: 11px;
     color: #e46600;
@@ -2908,6 +3338,153 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
   .popup-diario-input-drop::placeholder { color: rgba(0,0,0,0.35); }
   .popup-diario-input-drop:focus { border-color: #3a6edc; }
 
+  /* ── DATE PICKER PERÍODO DIÁRIO ── */
+  /* ── DATE PICKER PERÍODO DIÁRIO — wrapper customizado ── */
+  .diario-date-wrap {
+    flex: 1 1 0;
+    min-width: 0;
+    position: relative;
+    height: 34px;
+    border-radius: 8px;
+    border: 1.5px solid #dce6f8;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    gap: 6px;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    user-select: none;
+  }
+  .diario-date-wrap:hover { border-color: #b0c4ef; }
+  .diario-date-wrap.aberto { border-color: #3a6edc; box-shadow: 0 0 0 3px rgba(58,110,220,0.12); }
+  .diario-date-display {
+    font-size: 12px;
+    font-family: inherit;
+    color: #1a2a5e;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+  }
+  .diario-date-display.vazio { color: #aab8d8; }
+  .diario-date-wrap svg { flex-shrink: 0; color: #aab8d8; }
+
+/* ── CALENDÁRIO CUSTOMIZADO DIÁRIO ── */
+.dcal {
+  position: fixed;
+  z-index: 99999;
+  background: #fff;
+  border: 1.5px solid #a8c4f0;
+  border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(28,63,145,0.18), 0 2px 8px rgba(0,0,0,0.08);
+  padding: 14px 14px 12px;
+  width: 240px;
+  font-family: 'Century Gothic', 'Outfit', sans-serif;
+  user-select: none;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34,1.15,0.64,1);
+  pointer-events: none;
+}
+.dcal.visivel {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+.dcal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.dcal-mes-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f1f5c;
+  text-transform: capitalize;
+}
+.dcal-nav {
+  display: flex;
+  gap: 2px;
+}
+.dcal-nav button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a9cc8;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+}
+.dcal-nav button:hover { background: #f0f4fb; color: #1c3f91; }
+.dcal-nav button:disabled { opacity: 0.25; cursor: default; }
+.dcal-nav button:disabled:hover { background: none; color: #8a9cc8; }
+.dcal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.dcal-dow {
+  font-size: 10px;
+  font-weight: 700;
+  color: #aab8d8;
+  text-align: center;
+  padding: 4px 0 6px;
+  letter-spacing: 0.3px;
+}
+.dcal-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1a2a5e;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.dcal-day:hover { background: #f0f4fb; }
+.dcal-day.outro-mes { color: #ccd5e8; pointer-events: none; }
+.dcal-day.desabilitado { color: #dde3ef; pointer-events: none; cursor: default; }
+.dcal-day.desabilitado:hover { background: none; }
+.dcal-day.selecionado {
+  background: #1c3f91;
+  color: #fff;
+  font-weight: 700;
+}
+.dcal-day.selecionado:hover { background: #2a52b0; }
+.dcal-day.hoje:not(.selecionado) {
+  background: rgba(58,110,220,0.08);
+  color: #3a6edc;
+  font-weight: 700;
+}
+
+/* Dark mode */
+body.dark .dcal {
+  background: #0d1845;
+  border-color: rgba(168,196,240,0.2);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+body.dark .dcal-mes-label { color: rgba(255,255,255,0.9); }
+body.dark .dcal-nav button { color: rgba(255,255,255,0.4); }
+body.dark .dcal-nav button:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.9); }
+body.dark .dcal-dow { color: rgba(255,255,255,0.3); }
+body.dark .dcal-day { color: rgba(255,255,255,0.8); }
+body.dark .dcal-day:hover { background: rgba(255,255,255,0.1); }
+body.dark .dcal-day.outro-mes { color: rgba(255,255,255,0.15); }
+body.dark .dcal-day.desabilitado { color: rgba(255,255,255,0.15); }
+body.dark .dcal-day.selecionado { background: #3a6edc; color: #fff; }
+body.dark .dcal-day.hoje:not(.selecionado) { background: rgba(58,110,220,0.2); color: #6b9ef8; }
+
   /* ── CARDS PREVISÃO DE SALDO e GASTOS ── */
   .previsao-card {
     background: #fff;
@@ -3335,6 +3912,85 @@ body::-webkit-scrollbar-thumb:hover  { background: #6e8ec4; }
     display: inline-flex;
     align-items: center;
   }
+/* ── Badge de tendência nos widgets compactos ── */
+.anual-tendencia-badge {
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 2px 7px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+.anual-tendencia-badge.tendencia-pos {
+  color: #15803d;
+  background: rgba(22,163,74,0.10);
+}
+.anual-tendencia-badge.tendencia-neg {
+  color: #b91c1c;
+  background: rgba(220,38,38,0.10);
+}
+body.dark .anual-tendencia-badge.tendencia-pos {
+  color: #4ade80;
+  background: rgba(74,222,128,0.12);
+}
+body.dark .anual-tendencia-badge.tendencia-neg {
+  color: #f87171;
+  background: rgba(248,113,113,0.12);
+}
+
+/* ══ POPUP RESUMO MENSAL ══ */
+.resumo-metrica {
+  background: #f5f8fe;
+  border-radius: 12px;
+  padding: 12px 10px;
+  text-align: center;
+  border: 1.5px solid #e4eaf8;
+}
+.resumo-metrica-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #8a9cc8;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 5px;
+}
+.resumo-metrica-val {
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f1f5c;
+}
+.resumo-metrica-val.verde    { color: #16a34a; }
+.resumo-metrica-val.vermelho { color: #c0392b; }
+.resumo-metrica-val.azul     { color: #1c3f91; }
+
+body.dark #popup-resumo-mes {
+  background: #1a2f6e;
+  box-shadow: 0 16px 56px rgba(0,0,0,0.45);
+}
+body.dark #popup-resumo-header {
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+body.dark #resumo-titulo-mes,
+body.dark .resumo-metrica-val { color: rgba(255,255,255,0.92); }
+body.dark .resumo-metrica-val.verde    { color: #4ade80; }
+body.dark .resumo-metrica-val.vermelho { color: #f87171; }
+body.dark .resumo-metrica-val.azul     { color: #7ab0ff; }
+body.dark .resumo-metrica {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.08);
+}
+body.dark .resumo-metrica-label { color: rgba(255,255,255,0.35); }
+body.dark #resumo-comparacao,
+body.dark #resumo-reserva-row {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
+}
+body.dark #popup-resumo-mes [style*="font-size:11px;color:#8a9cc8"] { color: rgba(255,255,255,0.35) !important; }
+body.dark #popup-resumo-mes [style*="font-size:12px;color:#5a6a8a"] { color: rgba(255,255,255,0.5) !important; }
+body.dark #resumo-barra-gasto + div span { color: rgba(255,255,255,0.45) !important; }
+
 /* ══ TOPNAV TABS ══ */
 .topnav-tabs {
   display: flex;
@@ -4400,6 +5056,70 @@ body.tour-ativo .select-banco-list {
 }
 .auth-btn-social:active { transform: scale(0.98); }
 
+/* ── Escolha de perfil de renda (pós-cadastro) ── */
+.perfil-renda-opcoes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.perfil-renda-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(220,230,248,0.16);
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.18s, border-color 0.18s, transform 0.15s;
+}
+.perfil-renda-card:hover {
+  background: rgba(58,110,220,0.14);
+  border-color: rgba(120,160,255,0.4);
+  transform: translateY(-1px);
+}
+.perfil-renda-card:active { transform: scale(0.98); }
+.perfil-renda-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: rgba(58,110,220,0.18);
+  color: #8ab0ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.perfil-renda-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.perfil-renda-text strong {
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+.perfil-renda-text span {
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+  font-size: 12px;
+  color: rgba(160,185,230,0.65);
+  line-height: 1.4;
+}
+.perfil-renda-chevron {
+  flex-shrink: 0;
+  color: rgba(160,185,230,0.45);
+  transition: transform 0.18s, color 0.18s;
+}
+.perfil-renda-card:hover .perfil-renda-chevron {
+  color: #8ab0ff;
+  transform: translateX(2px);
+}
+
 /* Divisor "ou" */
 .auth-or {
   display: flex;
@@ -5175,6 +5895,19 @@ body.dark .btn-replicar-linha:hover {
   color: #7eb3ff;
   background: rgba(100,160,255,0.15);
 }
+body.dark .btn-sal-menu { color: rgba(255,255,255,0.25); }
+body.dark .btn-sal-menu:hover { color: #7eb3ff; background: rgba(100,160,255,0.15); }
+body.dark .sal-menu-dropdown {
+  background: #0d1845;
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+}
+body.dark .sal-menu-dropdown button { color: rgba(255,255,255,0.85); }
+body.dark .sal-menu-dropdown button:hover { background: rgba(255,255,255,0.08); }
+body.dark .sal-menu-dropdown button svg { color: rgba(255,255,255,0.35); }
+body.dark .sal-menu-dropdown button.sal-menu-danger { color: #e87070; }
+body.dark .sal-menu-dropdown button.sal-menu-danger svg { color: #e87070; }
+body.dark .sal-menu-dropdown button.sal-menu-danger:hover { background: rgba(220,50,50,0.1); }
 body.dark .replicar-tooltip {
   background: linear-gradient(135deg, #1a2f6e, #2a4a9e);
   color: #c8dcff;
@@ -5770,6 +6503,7 @@ body.dark .diario-vazio-desc { color: rgba(255,255,255,0.5); }
 /* ══ POPUPS ══ */
 body.dark #popup-replicar,
 body.dark #popup-replicar-mes,
+body.dark #popup-replicar-sal,
 body.dark #popup-subcategoria,
 body.dark #popup-conflito,
 body.dark #popup-apagar-parcelas,
@@ -6039,6 +6773,16 @@ body.dark .popup-diario-input-drop {
 }
 body.dark .popup-diario-input-drop::placeholder { color: rgba(255,255,255,0.28); }
 body.dark .popup-diario-input-drop:focus { border-color: rgba(255,255,255,0.4); }
+
+body.dark .diario-date-wrap {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.14);
+}
+body.dark .diario-date-wrap:hover { border-color: rgba(255,255,255,0.28); }
+body.dark .diario-date-wrap.aberto { border-color: rgba(255,255,255,0.4); box-shadow: 0 0 0 3px rgba(255,255,255,0.07); }
+body.dark .diario-date-display { color: rgba(255,255,255,0.9); }
+body.dark .diario-date-display.vazio { color: rgba(255,255,255,0.3); }
+body.dark .diario-date-wrap svg { color: rgba(255,255,255,0.35); }
 
 /* ── Dropdown de ano ── */
 body.dark #ano-dropdown-list {
@@ -6837,9 +7581,7 @@ body.dark .popup-cat-btn-add:hover { color: rgba(255,255,255,0.7); }
 
 .anual-container {
   width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 80px 40px;
+  padding: 48px 60px 60px;
   box-sizing: border-box;
 }
 
@@ -6848,10 +7590,8 @@ body.dark .popup-cat-btn-add:hover { color: rgba(255,255,255,0.7); }
   align-items: center;
   justify-content: flex-end;
   width: 100%;
-  max-width: 1100px;
-  padding: 0 40px;
+  padding: 0 0 36px;
   box-sizing: border-box;
-  margin-bottom: 28px;
   position: relative;
 }
 
@@ -6887,88 +7627,135 @@ body.dark .anual-ano-label { color: rgba(255,255,255,0.85); }
   min-height: calc(100vh - 52px);
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
 
-/* ── Grid ── */
+body.pagina-anual {
+  overflow: hidden;
+}
+
+/* ── Grid assimétrico: saldo à esquerda, 3 compactos à direita ── */
 .anual-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 28px;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 24px;
   align-items: stretch;
+  margin-top: 32px;
 }
 
-/* ── Card ── */
+.anual-col-direita {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Card base ── */
 .anual-widget {
   background: #fff;
   border-radius: 18px;
   border: 1.5px solid #a8c4f0;
-  box-shadow: 0 4px 20px rgba(28,63,145,0.12);
-  padding: 42px 32px 36px;
+  box-shadow: 0 4px 20px rgba(28,63,145,0.10);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
   cursor: pointer;
   user-select: none;
   transition: box-shadow 0.2s, transform 0.18s;
-  gap: 4px;
 }
 .anual-widget:hover {
-  box-shadow: 0 6px 24px rgba(28,63,145,0.14);
+  box-shadow: 0 6px 28px rgba(28,63,145,0.15);
   transform: translateY(-2px);
 }
 body.dark .anual-widget {
   background: rgba(255,255,255,0.04);
-  border-color: rgba(160,200,255,0.35);
+  border-color: rgba(160,200,255,0.32);
   box-shadow: 0 2px 16px rgba(0,0,0,0.25);
 }
-body.dark .anual-widget:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.35); }
+body.dark .anual-widget:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.38); }
 
-/* Gradiente diagonal suave por card */
+/* Gradiente diagonal suave */
 #widget-faturado,
 #widget-gastos,
 #widget-saldo,
-#widget-reserva  { background: linear-gradient(180deg, rgba(58,110,220,0.04) 0%, #fff 45%); }
+#widget-reserva  { background: linear-gradient(145deg, rgba(58,110,220,0.04) 0%, #fff 55%); }
 body.dark #widget-faturado,
 body.dark #widget-gastos,
 body.dark #widget-saldo,
-body.dark #widget-reserva { background: linear-gradient(180deg, rgba(58,110,220,0.08) 0%, rgba(255,255,255,0.04) 45%); }
+body.dark #widget-reserva { background: linear-gradient(145deg, rgba(58,110,220,0.10) 0%, rgba(255,255,255,0.03) 55%); }
 
+/* ── Card SALDO — protagonista ── */
+.anual-widget--saldo {
+  padding: 40px 40px 32px;
+  gap: 0;
+}
+
+/* ── Cards compactos (Faturado / Gasto / Reserva) ── */
+.anual-widget--sm {
+  padding: 28px 32px;
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+/* ── Topo: ícone + info ── */
+.anual-widget-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.anual-widget--sm .anual-widget-top {
+  display: contents; /* ícone e info ficam inline no flex row do card */
+}
+
+.anual-widget-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Ícone ── */
 .anual-widget-icon {
-  width: 58px; height: 58px;
-  border-radius: 16px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 12px;
+  flex-shrink: 0;
 }
+.anual-widget--saldo .anual-widget-icon { width: 60px; height: 60px; margin-top: 2px; }
+.anual-widget--sm   .anual-widget-icon  { width: 52px; height: 52px; }
+
 .anual-widget-icon--verde    { background: rgba(34,197,94,0.12);  color: #16a34a; }
 .anual-widget-icon--vermelho { background: rgba(239,68,68,0.10);  color: #dc2626; }
-.anual-widget-icon--azul     { background: rgba(58,110,220,0.10);  color: #1c3f91; }
-.anual-widget-icon--dourado  { background: rgba(202,138,4,0.12);   color: #a16207; }
-body.dark .anual-widget-icon--verde    { background: rgba(34,197,94,0.15);  color: #4ade80; }
-body.dark .anual-widget-icon--vermelho { background: rgba(239,68,68,0.15);  color: #f87171; }
+.anual-widget-icon--azul     { background: rgba(58,110,220,0.10); color: #1c3f91; }
+.anual-widget-icon--dourado  { background: rgba(202,138,4,0.12);  color: #a16207; }
+body.dark .anual-widget-icon--verde    { background: rgba(34,197,94,0.15);   color: #4ade80; }
+body.dark .anual-widget-icon--vermelho { background: rgba(239,68,68,0.15);   color: #f87171; }
 body.dark .anual-widget-icon--azul     { background: rgba(100,160,255,0.15); color: #7ab0ff; }
 body.dark .anual-widget-icon--dourado  { background: rgba(250,204,21,0.15);  color: #fbbf24; }
 
+/* ── Labels e valores ── */
 .anual-widget-label {
   font-family: 'Outfit', 'Century Gothic', sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #8a9cc8;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
+  margin-bottom: 2px;
 }
-body.dark .anual-widget-label { color: rgba(255,255,255,0.4); }
+body.dark .anual-widget-label { color: rgba(255,255,255,0.38); }
 
 .anual-widget-total {
   font-family: 'Outfit', 'Century Gothic', sans-serif;
-  font-size: 34px;
   font-weight: 700;
-  line-height: 1.15;
-  margin: 6px 0 4px;
+  line-height: 1.1;
 }
+.anual-widget--saldo .anual-widget-total { font-size: 52px; margin-bottom: 4px; }
+.anual-widget--sm    .anual-widget-total { font-size: 30px; }
+
 .anual-widget-total.verde    { color: #0f1f5c; }
 .anual-widget-total.vermelho { color: #0f1f5c; }
 .anual-widget-total.azul     { color: #0f1f5c; }
@@ -6981,23 +7768,200 @@ body.dark .anual-widget-total.dourado  { color: rgba(255,255,255,0.92); }
 body.dark .anual-widget-total.vermelho-saldo { color: #f87171; }
 
 .anual-widget-desc {
-  font-size: 11px;
+  font-size: 12.5px;
   color: #b0bcd8;
-  margin-bottom: 12px;
 }
-body.dark .anual-widget-desc { color: rgba(255,255,255,0.25); }
+body.dark .anual-widget-desc { color: rgba(255,255,255,0.22); }
 
+/* ── CTA ── */
 .anual-widget-cta {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   font-family: 'Outfit', 'Century Gothic', sans-serif;
   color: #3a6edc;
-  opacity: 0.6;
+  opacity: 0.55;
   transition: opacity 0.15s;
+  margin-top: 22px;
+  align-self: flex-end;
 }
 .anual-widget:hover .anual-widget-cta { opacity: 1; }
-body.dark .anual-widget-cta { color: rgba(100,160,255,0.7); }
+body.dark .anual-widget-cta { color: rgba(100,160,255,0.65); }
 body.dark .anual-widget:hover .anual-widget-cta { color: rgba(100,160,255,1); opacity: 1; }
+
+/* ── Sparkline — versão grande (saldo) ── */
+.anual-sparkline-wrap { }
+.anual-sparkline-wrap--lg {
+  margin-top: auto;
+  padding-top: 8px;
+}
+.anual-sparkline-wrap--mini {
+  flex-shrink: 0;
+  width: 110px;
+}
+
+.anual-sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  width: 100%;
+}
+.anual-sparkline--lg   { height: 130px; }
+.anual-sparkline--mini { height: 56px; gap: 2px; }
+
+.anual-spark-bar {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  min-height: 5px;
+  transition: height 0.4s cubic-bezier(0.34,1.2,0.64,1);
+}
+.anual-spark-bar--verde    { background: rgba(22,163,74,0.70); }
+.anual-spark-bar--vermelho { background: rgba(220,38,38,0.62); }
+.anual-spark-bar--azul-pos { background: rgba(28,63,145,0.65); }
+.anual-spark-bar--azul-neg { background: rgba(220,38,38,0.65); }
+.anual-spark-bar--dourado  { background: rgba(161,98,7,0.62);  }
+.anual-spark-bar--vazio    { background: rgba(58,110,220,0.10); }
+
+.anual-spark-bar--destaque.anual-spark-bar--verde    { background: #16a34a; }
+.anual-spark-bar--destaque.anual-spark-bar--vermelho { background: #dc2626; }
+.anual-spark-bar--destaque.anual-spark-bar--azul-pos { background: #1c3f91; }
+.anual-spark-bar--destaque.anual-spark-bar--azul-neg { background: #dc2626; }
+.anual-spark-bar--destaque.anual-spark-bar--dourado  { background: #a16207; }
+
+body.dark .anual-spark-bar--verde    { background: rgba(74,222,128,0.55); }
+body.dark .anual-spark-bar--vermelho { background: rgba(248,113,113,0.55); }
+body.dark .anual-spark-bar--azul-pos { background: rgba(100,160,255,0.58); }
+body.dark .anual-spark-bar--azul-neg { background: rgba(248,113,113,0.58); }
+body.dark .anual-spark-bar--dourado  { background: rgba(251,191,36,0.52); }
+body.dark .anual-spark-bar--vazio    { background: rgba(255,255,255,0.09); }
+body.dark .anual-spark-bar--destaque.anual-spark-bar--verde    { background: #4ade80; }
+body.dark .anual-spark-bar--destaque.anual-spark-bar--vermelho { background: #f87171; }
+body.dark .anual-spark-bar--destaque.anual-spark-bar--azul-pos { background: #7ab0ff; }
+body.dark .anual-spark-bar--destaque.anual-spark-bar--azul-neg { background: #f87171; }
+body.dark .anual-spark-bar--destaque.anual-spark-bar--dourado  { background: #fbbf24; }
+
+.anual-spark-meses {
+  display: flex;
+  gap: 3px;
+  margin-top: 5px;
+}
+.anual-spark-mes {
+  flex: 1;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #c0cce8;
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+  text-align: center;
+  line-height: 1;
+}
+.anual-spark-mes--destaque { color: #1c3f91; font-weight: 700; }
+body.dark .anual-spark-mes { color: rgba(255,255,255,0.18); }
+body.dark .anual-spark-mes--destaque { color: rgba(150,200,255,0.85); }
+
+/* ── Coluna + dot do mês atual no sparkline grande ── */
+.anual-spark-col-destaque {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+.anual-spark-col-destaque .anual-spark-bar {
+  width: 100%;
+  flex: none;
+}
+.anual-spark-dot-atual {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #1c3f91;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+body.dark .anual-spark-dot-atual { background: #7ab0ff; }
+
+/* ── Barra de proporção ── */
+.anual-proporcao-wrap {
+  margin-top: 2px;
+  margin-bottom: 14px;
+}
+
+.anual-proporcao-track {
+  width: 100%;
+  height: 14px;
+  border-radius: 8px;
+  background: rgba(58,110,220,0.07);
+  overflow: hidden;
+  display: flex;
+}
+body.dark .anual-proporcao-track { background: rgba(255,255,255,0.07); }
+
+.anual-proporcao-gasto {
+  height: 100%;
+  background: linear-gradient(90deg, #c83232, #e05555);
+  border-radius: 6px 0 0 6px;
+  transition: width 0.55s cubic-bezier(0.34,1.1,0.64,1);
+}
+body.dark .anual-proporcao-gasto { background: linear-gradient(90deg, #dc2626, #f87171); }
+
+.anual-proporcao-saldo {
+  height: 100%;
+  background: linear-gradient(90deg, #1c3f91, #3a6edc);
+  border-radius: 0 6px 6px 0;
+  transition: width 0.55s cubic-bezier(0.34,1.1,0.64,1);
+}
+body.dark .anual-proporcao-saldo { background: linear-gradient(90deg, #2a5fd4, #5a9aff); }
+
+.anual-proporcao-legenda {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 7px;
+}
+.anual-prop-leg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+}
+.anual-prop-leg--gasto { color: #c83232; }
+.anual-prop-leg--saldo { color: #1c3f91; }
+body.dark .anual-prop-leg--gasto { color: #f87171; }
+body.dark .anual-prop-leg--saldo { color: #7ab0ff; }
+.anual-prop-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.anual-prop-dot--gasto { background: #c83232; }
+.anual-prop-dot--saldo { background: #1c3f91; }
+body.dark .anual-prop-dot--gasto { background: #f87171; }
+body.dark .anual-prop-dot--saldo { background: #7ab0ff; }
+
+/* ── Insight inline (dentro do card saldo) ── */
+.anual-insight-inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  background: rgba(58,110,220,0.05);
+  border: 1px solid rgba(58,110,220,0.11);
+  border-radius: 12px;
+  padding: 13px 18px;
+  font-size: 13px;
+  color: #4a5a8a;
+  font-family: 'Outfit', 'Century Gothic', sans-serif;
+  line-height: 1.55;
+  margin-bottom: 6px;
+}
+body.dark .anual-insight-inline {
+  background: rgba(100,160,255,0.07);
+  border-color: rgba(100,160,255,0.14);
+  color: rgba(200,220,255,0.65);
+}
+.anual-insight-icon {
+  color: #3a6edc;
+  flex-shrink: 0;
+  opacity: 0.65;
+  margin-top: 1px;
+}
+body.dark .anual-insight-icon { color: rgba(100,160,255,0.75); }
 
 /* ── Popup gráfico ── */
 .anual-popup-header {
@@ -7139,7 +8103,7 @@ body.dark .anual-bar-track--verde { background: linear-gradient(to top, #16a34a,
 .anual-bar-mes {
   position: absolute;
   bottom: -20px;
-  font-size: 10px;
+  font-size:10px;
   font-weight: 600;
   color: #9aabcc;
   font-family: 'Outfit', 'Century Gothic', sans-serif;
@@ -7151,3 +8115,87 @@ body.dark .anual-bar-mes { color: rgba(255,255,255,0.3); }
 .anual-bar-col.destaque .anual-bar-track { filter: drop-shadow(0 0 6px rgba(58,110,220,0.25)); }
 .anual-bar-col.destaque .anual-bar-mes { color: #1c3f91; font-weight: 700; }
 body.dark .anual-bar-col.destaque .anual-bar-mes { color: rgba(255,255,255,0.8); }
+/* ── BOTÃO PERSONALIZAR VISÃO ANUAL ── */
+.btn-anual-editar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1.5px solid #dce6f8;
+  border-radius: 8px;
+  background: #fff;
+  color: #8a9cc8;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.btn-anual-editar:hover { border-color: #3a6edc; color: #3a6edc; background: rgba(58,110,220,0.04); }
+.btn-anual-editar.ativo { border-color: #3a6edc; color: #fff; background: linear-gradient(135deg,#1c3f91,#3a6edc); }
+.btn-anual-editar.ativo svg { stroke: #fff; }
+body.dark .btn-anual-editar { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.12); color: rgba(255,255,255,0.45); }
+body.dark .btn-anual-editar:hover { border-color: #7ab0ff; color: #7ab0ff; background: rgba(100,160,255,0.08); }
+body.dark .btn-anual-editar.ativo { background: linear-gradient(135deg,#2a52b0,#4a7ed8); border-color: transparent; color: #fff; }
+
+/* ── MODO EDIÇÃO — widgets arrastáveis ── */
+/* ── Modo editar: widgets ── */
+.anual-grid.modo-editar .anual-widget {
+  cursor: grab;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  animation: widget-editar-in 0.25s ease both;
+}
+@keyframes widget-editar-in {
+  from { transform: scale(0.985); opacity: 0.6; }
+  to   { transform: scale(1);     opacity: 1;   }
+}
+.anual-grid.modo-editar .anual-widget:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 10px 32px rgba(58,110,220,0.18);
+  z-index: 2;
+}
+.anual-grid.modo-editar .anual-widget.dragging {
+  opacity: 0.25;
+  cursor: grabbing;
+  transform: scale(0.96);
+  box-shadow: none;
+}
+.anual-grid.modo-editar .anual-widget.drag-over {
+  transform: scale(1.02);
+  box-shadow: 0 0 0 2.5px #3a6edc, 0 12px 36px rgba(58,110,220,0.18);
+  background: rgba(58,110,220,0.03);
+}
+body.dark .anual-grid.modo-editar .anual-widget:hover {
+  box-shadow: 0 10px 32px rgba(100,160,255,0.18);
+}
+body.dark .anual-grid.modo-editar .anual-widget.drag-over {
+  box-shadow: 0 0 0 2.5px #7ab0ff, 0 12px 36px rgba(100,160,255,0.18);
+  background: rgba(100,160,255,0.05);
+}
+
+/* Badge arrastar */
+.anual-drag-hint {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'Outfit','Century Gothic',sans-serif;
+  color: #3a6edc;
+  background: rgba(58,110,220,0.10);
+  border-radius: 6px;
+  padding: 3px 8px;
+  letter-spacing: 0.3px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  animation: hint-in 0.3s ease 0.15s both;
+}
+@keyframes hint-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+body.dark .anual-drag-hint { color: #7ab0ff; background: rgba(100,160,255,0.15); }
+.anual-widget { position: relative; }

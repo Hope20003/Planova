@@ -58,7 +58,14 @@ function atualizarLinhaPaga(linha) {
 }
 
 function adicionarBotoesLimpar() {
-  document.querySelectorAll(".linha").forEach(linha => {
+  document.querySelectorAll(".linha").forEach(_inicializarLinha);
+}
+
+// Lógica por-linha extraída de adicionarBotoesLimpar() para poder ser
+// chamada isoladamente em linhas criadas dinamicamente (ex: padronização
+// de 5 linhas no perfil único — ver _aplicarPerfilRenda), sem reprocessar
+// (e duplicar o listener de checkbox em) todas as linhas já existentes.
+function _inicializarLinha(linha) {
     // Atualiza estado paga ao mudar checkbox
     const chk = linha.querySelector("input[type=checkbox]");
     if (chk) {
@@ -148,7 +155,6 @@ function adicionarBotoesLimpar() {
       _limparLinha(linha, sel, val, chk);
     });
     linha.appendChild(btn);
-  });
 }
 
 /* ── REVERTER COBERTURA ─────────────────────────────────────────────────
@@ -2298,12 +2304,12 @@ function _extrasCarregar() {
     const d = JSON.parse(localStorage.getItem(_EXTRAS_SAL_KEY()) || '{}');
     if (!Array.isArray(d['1'])) d['1'] = [];
     if (!Array.isArray(d['2'])) d['2'] = [];
-    // Por padrão, modo informativo ativo (true)
-    if (d['info1'] === undefined) d['info1'] = true;
-    if (d['info2'] === undefined) d['info2'] = true;
+    // Por padrão, modo informativo desativado (false)
+    if (d['info1'] === undefined) d['info1'] = false;
+    if (d['info2'] === undefined) d['info2'] = false;
     return d;
   }
-  catch(e) { return { '1': [], '2': [], info1: true, info2: true }; }
+  catch(e) { return { '1': [], '2': [], info1: false, info2: false }; }
 }
 function _extrasSalvar(dados) {
   localStorage.setItem(_EXTRAS_SAL_KEY(), JSON.stringify(dados));
@@ -2383,23 +2389,49 @@ function recalcExtrasSal(entrada) {
   recalc(true, true);
 }
 
+function toggleSalMenu(entrada) {
+  const menu  = document.getElementById('sal-menu-' + entrada);
+  const outro = document.getElementById('sal-menu-' + (entrada === 1 ? 2 : 1));
+  if (!menu) return;
+  // Fecha o outro se estiver aberto
+  if (outro) outro.classList.remove('aberto');
+  menu.classList.toggle('aberto');
+}
+
+// Fecha menus de salário ao clicar fora
+document.addEventListener('mousedown', function(e) {
+  [1, 2].forEach(function(n) {
+    const menu = document.getElementById('sal-menu-' + n);
+    const wrap = document.getElementById('sal-menu-wrap-' + n);
+    if (menu && menu.classList.contains('aberto') && wrap && !wrap.contains(e.target)) {
+      menu.classList.remove('aberto');
+    }
+  });
+});
+
 function toggleExtrasSal(entrada) {
+  // Fecha o menu ⋯ se estiver aberto
+  [1, 2].forEach(function(n) {
+    const m = document.getElementById('sal-menu-' + n);
+    if (m) m.classList.remove('aberto');
+  });
   const pop = document.getElementById('extras-sal-popover');
   if (_extrasEntradaAtiva === entrada && pop.classList.contains('visivel')) {
     fecharExtrasSal();
     return;
   }
   _extrasEntradaAtiva = entrada;
-  const btn = document.getElementById('btn-extras-sal' + entrada);
-  const r   = btn.getBoundingClientRect();
-  pop.style.top  = (r.bottom + 8) + 'px';
-  pop.style.left = Math.max(8, r.left - 160) + 'px';
+  const anchor = document.getElementById('sal-menu-wrap-' + entrada) || document.getElementById('btn-extras-sal' + entrada);
+  const r   = anchor.getBoundingClientRect();
+  const z   = _getCssZoom ? _getCssZoom() : 1;
+  pop.style.top  = (r.bottom / z + 8) + 'px';
+  pop.style.left = Math.max(8, r.left / z - 160) + 'px';
   _extrasAtualizarToggleUI(entrada);
   _extrasRenderizar(entrada);
   _extrasAtualizarBaseUI(entrada);
   pop.classList.add('visivel');
-  [1, 2].forEach(e => document.getElementById('btn-extras-sal' + e).classList.remove('ativo'));
-  btn.classList.add('ativo');
+  [1, 2].forEach(e => document.getElementById('btn-extras-sal' + e)?.classList.remove('ativo'));
+  document.getElementById('btn-extras-sal' + entrada)?.classList.add('ativo');
 }
 
 function _extrasAtualizarBaseUI(entrada) {
@@ -2630,7 +2662,9 @@ function _atualizarReadonlySal(entrada) {
   if (!input) return;
   const dados = _extrasCarregar();
   const temExtras = (dados[String(entrada)] || []).length > 0;
-  if (temExtras) {
+  const isInfo    = dados['info' + entrada] === true;
+  const bloquear  = temExtras && isInfo;
+  if (bloquear) {
     input.classList.add('com-extras');
     input.readOnly = true;
   } else {
@@ -2645,12 +2679,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const input = document.getElementById('sal' + entrada);
     if (!input) return;
 
-    // Enter: só confirma salário se não há extras activas
+    // Enter: só confirma salário se não há extras activas com somar ativo
     input.addEventListener('keydown', function(e) {
       if (e.key !== 'Enter') return;
-      const dados = _extrasCarregar();
+      const dados    = _extrasCarregar();
       const temExtras = (dados[String(entrada)] || []).length > 0;
-      if (temExtras) {
+      const isInfo    = dados['info' + entrada] === true;
+      if (temExtras && isInfo) {
         e.preventDefault();
         input.blur();
       } else {
@@ -2658,17 +2693,17 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
 
-    // Input: se há extras activas, rejeitar digitação e abrir popover
+    // Input: só rejeita digitação se há extras com somar ativo
     input.addEventListener('input', function() {
-      const dados = _extrasCarregar();
+      const dados     = _extrasCarregar();
       const temExtras = (dados[String(entrada)] || []).length > 0;
-      if (temExtras) {
+      const isInfo    = dados['info' + entrada] === true;
+      if (temExtras && isInfo) {
         // Restaura o valor total e abre o popover para edição
         const extras = (dados[String(entrada)] || []).reduce((s, e) => s + num(e.valor), 0);
-        const isInfo = dados['info' + entrada] === true;
-        const base = num(input._valorBase || '');
-        const total = isInfo ? base + extras : base;
-        input.value = total > 0 ? brl(total) : (input._valorBase || '');
+        const base   = num(input._valorBase || '');
+        const total  = base + extras;
+        input.value  = total > 0 ? brl(total) : (input._valorBase || '');
         // Abre popover se não estiver aberto
         if (_extrasEntradaAtiva !== entrada) {
           toggleExtrasSal(entrada);
@@ -2683,16 +2718,16 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
 
-    // Blur: se há extras, restaura o total (não aceita valor digitado directamente)
+    // Blur: só restaura total se há extras com somar ativo
     input.addEventListener('blur', function() {
-      const dados = _extrasCarregar();
+      const dados     = _extrasCarregar();
       const temExtras = (dados[String(entrada)] || []).length > 0;
-      if (temExtras) {
+      const isInfo    = dados['info' + entrada] === true;
+      if (temExtras && isInfo) {
         const extras = (dados[String(entrada)] || []).reduce((s, e) => s + num(e.valor), 0);
-        const isInfo = dados['info' + entrada] === true;
-        const base = num(input._valorBase || '');
-        const total = isInfo ? base + extras : base;
-        input.value = total > 0 ? brl(total) : (input._valorBase || '');
+        const base   = num(input._valorBase || '');
+        const total  = base + extras;
+        input.value  = total > 0 ? brl(total) : (input._valorBase || '');
       }
     });
   });
@@ -4886,6 +4921,19 @@ function _renderizarMetaComSaldo(dados) {
   fill.className = "reserva-prog-fill" + (cor ? " " + cor : "") + (pctVal >= 100 ? " completo" : "");
   pctEl.textContent = pctVal.toFixed(2).replace(".", ",") + "%";
   pctEl.className = "reserva-prog-pct" + (pctVal >= 80 ? " verde" : pctVal >= 40 ? " amarelo" : "");
+
+  // Anel de progresso (modo 1 entrada) — espelha o mesmo pctVal da barra
+  // linear acima. Guard com "if" porque o anel só existe no DOM uma vez
+  // (elemento compartilhado, movido via appendChild igual ao resto do
+  // card); calcular tudo aqui garante que fica sempre sincronizado com
+  // a barra, sem precisar duplicar a lógica de cálculo em outro lugar.
+  const ringProgress = document.getElementById("meta-ring-progress");
+  if (ringProgress) {
+    const CIRCUNFERENCIA = 2 * Math.PI * 19; // r=19, mesmo raio do círculo no index.html
+    const offset = CIRCUNFERENCIA - (CIRCUNFERENCIA * pctVal / 100);
+    ringProgress.style.strokeDasharray = CIRCUNFERENCIA.toFixed(2);
+    ringProgress.style.strokeDashoffset = offset.toFixed(2);
+  }
 }
 
 function atualizarBarraReserva() {
@@ -5444,6 +5492,162 @@ function fecharPopupReplicarMes() {
   _replicarMesQtd = 0;
 }
 
+// ── REPLICAR SALÁRIO ──────────────────────────────────────────
+let _replicarSalEntrada = 0;
+let _replicarSalQtd = 0;
+
+function _replicarSalVerificarBloqueio() {
+  // 1. Mês fechado em qualquer ponto à frente → bloqueia sempre
+  for (let p = 1; ; p++) {
+    const totalMes = indice + p;
+    const mesAlvo  = totalMes % 12;
+    const anoAlvo  = anoAtual + Math.floor(totalMes / 12);
+    if (anoAlvo > ANO_MAX || (anoAlvo === ANO_MAX && mesAlvo > MES_MAX)) break;
+    if (mesFechado(anoAlvo, mesAlvo)) return 'fechado';
+  }
+  // 2. Salário da mesma entrada já preenchido em algum mês destino (dentro da qtd selecionada)
+  if (_replicarSalQtd >= 1) {
+    for (let p = 1; p <= _replicarSalQtd; p++) {
+      const totalMes = indice + p;
+      const mesAlvo  = totalMes % 12;
+      const anoAlvo  = anoAtual + Math.floor(totalMes / 12);
+      if (anoAlvo > ANO_MAX || (anoAlvo === ANO_MAX && mesAlvo > MES_MAX)) break;
+      const chavePlan = 'planejamento_' + anoAlvo + '_' + mesAlvo;
+      const dadosDest = JSON.parse(localStorage.getItem(chavePlan) || '{}');
+      if (dadosDest['sal' + _replicarSalEntrada]) return 'preenchido';
+    }
+  }
+  return null; // sem bloqueio
+}
+
+function _replicarSalAtualizarEstado() {
+  const aviso = document.getElementById('popup-replicar-sal-aviso');
+  const btn   = document.getElementById('btn-replicar-sal-confirmar');
+  if (!aviso || !btn) return;
+  const motivo = _replicarSalVerificarBloqueio();
+  if (motivo === 'fechado') {
+    aviso.textContent = 'Existem meses fechados a partir deste mês. Reabra todos os meses seguintes antes de replicar o salário.';
+    aviso.style.display = 'block';
+    btn.classList.add('bloqueado');
+  } else if (motivo === 'preenchido') {
+    aviso.textContent = 'Um ou mais meses do período já têm salário preenchido. Apague manualmente em cada mês antes de replicar.';
+    aviso.style.display = 'block';
+    btn.classList.add('bloqueado');
+  } else {
+    aviso.style.display = 'none';
+    btn.classList.remove('bloqueado');
+  }
+}
+
+function abrirPopupReplicarSal(entrada) {
+  _replicarSalEntrada = entrada;
+  _replicarSalQtd = 0;
+
+  const salVal = document.getElementById('sal' + entrada)?.value || '';
+  const subtitulo = document.getElementById('popup-replicar-sal-subtitulo');
+  if (subtitulo) {
+    subtitulo.textContent = 'Salário' + (salVal ? ' de ' + salVal : '') + ' e entradas extras serão copiados para os próximos meses';
+  }
+
+  // Avalia bloqueio imediatamente ao abrir
+  _replicarSalAtualizarEstado();
+
+  // Gera botões de meses (1x a 6x)
+  const grid = document.getElementById('parcelas-sal-grid');
+  grid.innerHTML = '';
+  for (let i = 1; i <= 6; i++) {
+    const b = document.createElement('button');
+    b.className = 'parcela-btn';
+    b.textContent = i + 'x';
+    b.dataset.meses = i;
+    b.addEventListener('click', function() {
+      document.querySelectorAll('#parcelas-sal-grid .parcela-btn').forEach(x => x.classList.remove('ativo'));
+      b.classList.add('ativo');
+      _replicarSalQtd = i;
+      document.getElementById('parcela-sal-custom-input').value = '';
+      _replicarSalAtualizarEstado();
+    });
+    grid.appendChild(b);
+  }
+
+  document.getElementById('parcela-sal-custom-input').value = '';
+  document.getElementById('parcela-sal-custom-input').oninput = function() {
+    const v = parseInt(this.value);
+    if (v >= 1) {
+      _replicarSalQtd = v;
+      document.querySelectorAll('#parcelas-sal-grid .parcela-btn').forEach(x => x.classList.remove('ativo'));
+      _replicarSalAtualizarEstado();
+    }
+  };
+
+  const overlay = document.getElementById('popup-replicar-sal-overlay');
+  const popup   = document.getElementById('popup-replicar-sal');
+  overlay.classList.add('visivel');
+  requestAnimationFrame(() => requestAnimationFrame(() => popup.classList.add('visivel')));
+}
+
+function fecharPopupReplicarSal() {
+  document.getElementById('popup-replicar-sal-overlay').classList.remove('visivel');
+  document.getElementById('popup-replicar-sal').classList.remove('visivel');
+  _replicarSalQtd = 0;
+}
+
+function confirmarReplicarSal() {
+  if (_replicarSalQtd < 1) {
+    exibirToastSaldo('Selecione ou digite a quantidade de meses para replicar.');
+    return;
+  }
+  if (_replicarSalVerificarBloqueio()) return;
+
+  // _valorBase é a fonte de verdade do salário base (sem extras somadas)
+  const salInput = document.getElementById('sal' + _replicarSalEntrada);
+  const salVal   = (salInput && salInput._valorBase !== undefined && salInput._valorBase !== '')
+                   ? salInput._valorBase
+                   : (salInput ? salInput.value : '');
+
+  // Extras do mês atual para esta entrada
+  const extrasAtual   = _extrasCarregar();
+  const extrasEntrada = extrasAtual[String(_replicarSalEntrada)] || [];
+  const infoEntrada   = extrasAtual['info' + _replicarSalEntrada] === true;
+  const baseEntrada   = salVal;
+
+  let replicados = 0;
+
+  for (let p = 1; p <= _replicarSalQtd; p++) {
+    const totalMes = indice + p;
+    const mesAlvo  = totalMes % 12;
+    const anoAlvo  = anoAtual + Math.floor(totalMes / 12);
+    if (anoAlvo > ANO_MAX || (anoAlvo === ANO_MAX && mesAlvo > MES_MAX)) break;
+
+    // Grava sal no planejamento
+    const chavePlan = 'planejamento_' + anoAlvo + '_' + mesAlvo;
+    const dadosDest = JSON.parse(localStorage.getItem(chavePlan) || '{}');
+    dadosDest['sal' + _replicarSalEntrada] = salVal;
+    localStorage.setItem(chavePlan, JSON.stringify(dadosDest));
+
+    // Grava extras_sal — replica estado exato do mês atual
+    const chaveExtras = 'extras_sal_' + anoAlvo + '_' + mesAlvo;
+    const extrasDest  = JSON.parse(localStorage.getItem(chaveExtras) || '{}');
+    extrasDest['base' + _replicarSalEntrada] = baseEntrada;
+    extrasDest[String(_replicarSalEntrada)]  = JSON.parse(JSON.stringify(extrasEntrada));
+    extrasDest['info' + _replicarSalEntrada] = infoEntrada;
+    localStorage.setItem(chaveExtras, JSON.stringify(extrasDest));
+
+    replicados++;
+  }
+
+  fecharPopupReplicarSal();
+
+  const feedbackEl = document.createElement('div');
+  feedbackEl.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);' +
+    'background:linear-gradient(135deg,#1c3f91,#3a6edc);color:#fff;padding:12px 24px;' +
+    'border-radius:10px;font-size:13px;font-weight:700;font-family:inherit;' +
+    'box-shadow:0 4px 20px rgba(58,110,220,0.4);z-index:99999;white-space:nowrap;';
+  feedbackEl.textContent = '✓ Salário replicado em ' + replicados + (replicados === 1 ? ' mês!' : ' meses!');
+  document.body.appendChild(feedbackEl);
+  setTimeout(() => feedbackEl.remove(), 3000);
+}
+
 function confirmarReplicarMes() {
   if (_replicarMesQtd < 1) {
     exibirToastSaldo("Selecione ou digite a quantidade de meses para replicar.");
@@ -5536,17 +5740,16 @@ function _fazerReplicarMes(modo) {
 
     if (mesesComDadosSet.has(p) && modo === "manter") continue;
 
+    // Copia os gastos mas preserva sempre o salário do mês destino
     let novosDados = Object.assign({}, dadosAtual);
-    if (modo === "manter") {
-      const raw = localStorage.getItem(chave);
-      if (raw) {
-        const dest = JSON.parse(raw);
-        if (dest.sal1) novosDados.sal1 = dest.sal1;
-        if (dest.sal2) novosDados.sal2 = dest.sal2;
-      }
-    }
+    const rawDest = localStorage.getItem(chave);
+    const dest    = rawDest ? JSON.parse(rawDest) : {};
+    // Salário nunca é sobrescrito pelo replicar mês — usa o que já está no destino
+    if (dest.sal1) novosDados.sal1 = dest.sal1; else delete novosDados.sal1;
+    if (dest.sal2) novosDados.sal2 = dest.sal2; else delete novosDados.sal2;
 
     localStorage.setItem(chave, JSON.stringify(novosDados));
+
     replicados++;
   }
 
@@ -5589,12 +5792,117 @@ window.addEventListener("DOMContentLoaded", function() {
   adicionarBotoesLimpar();
   inicializarCoresBancos();
   inicializarDropdownsMeta();
+  _aplicarPerfilRenda();
   carregarMes();
   carregarMetaReserva();
   atualizarBarraReserva();
   atualizarDisplayReserva();
   _inicializarIconePrevisao();
 });
+
+/* ── Aplica o layout do perfil de renda escolhido no 1º acesso ──
+ *  'unica': esconde a coluna 2 via CSS (classe no body) e trava
+ *  sal2 em 0 — o motor de cálculo (recalc, fechamento, replicação,
+ *  anual) continua somando sal1+sal2 normalmente, só que a segunda
+ *  entrada nunca recebe valor. Nenhuma função de cálculo é alterada. ── */
+function _aplicarPerfilRenda() {
+  // Atalho de debug: ?perfil=unica ou ?perfil=duas na URL força o valor,
+  // sem precisar passar pelo cadastro/login. Útil só para testes.
+  const urlParams = new URLSearchParams(window.location.search);
+  const debugPerfil = urlParams.get('perfil');
+  if (debugPerfil === 'unica' || debugPerfil === 'duas') {
+    localStorage.setItem('planova_perfil_renda', debugPerfil);
+  }
+
+  const perfil = localStorage.getItem('planova_perfil_renda');
+  if (perfil !== 'unica') return;
+
+  document.body.classList.add('perfil-unico');
+
+  const sal2 = document.getElementById('sal2');
+  if (sal2) {
+    sal2.value = '';
+    sal2.readOnly = true;
+    sal2.tabIndex = -1;
+  }
+  // Impede qualquer tentativa de digitar/colar em sal2, mesmo via DevTools acidental
+  if (sal2) {
+    sal2.addEventListener('input', function() { sal2.value = ''; recalc(); });
+  }
+
+  // Move os cards de previsão/reserva/metas do painel-direita (que fica
+  // oculto) para #pu-grid-extra, a célula responsável pela 2ª linha do
+  // layout único. appendChild move o nó real — preserva ids, onclick,
+  // listeners e qualquer estado já presente no elemento.
+  // Saldo+Gastos e Reserva+Metas ficam em wrappers PRÓPRIOS (em vez de
+  // direto no grid) pra que a altura de um lado não dependa do outro —
+  // antes, ao esticar Saldo/Gastos pra acompanhar a altura de
+  // Reserva+Metas, qualquer mudança no card de metas inflava os cards
+  // de previsão também, ficando desproporcional.
+  const destino = document.getElementById('pu-grid-extra');
+  if (destino && !document.getElementById('pu-cards-principais')) {
+    const principais = document.createElement('div');
+    principais.id = 'pu-cards-principais';
+    const sidebar = document.createElement('div');
+    sidebar.id = 'pu-sidebar';
+
+    const saldo = document.querySelector('.previsao-card--saldo');
+    const gastos = document.querySelector('.previsao-card:not(.previsao-card--saldo)');
+    const reserva = document.querySelector('.reserva-card');
+    const metas = document.querySelector('.metas-reserva-card-outer');
+    if (saldo) principais.appendChild(saldo);
+    if (gastos) principais.appendChild(gastos);
+    if (reserva) sidebar.appendChild(reserva);
+    if (metas) sidebar.appendChild(metas);
+
+    destino.appendChild(principais);
+    destino.appendChild(sidebar);
+  }
+
+  // Insere separadores verticais entre Residência/Cartões/Outros — sem
+  // eles os 3 blocos ficam soltos no layout em flex. Reaproveita a
+  // mesma classe .separador usada entre colunas (mesmo visual, só sem
+  // a margem inline que aqui é dispensada — o espaçamento já vem do
+  // gap do .blocos-area). Guard contra duplicar em re-execuções.
+  const blocosArea = document.querySelector('#coluna1-wrapper .blocos-area');
+  if (blocosArea && !blocosArea.querySelector('.separador')) {
+    const blocos = Array.from(blocosArea.querySelectorAll(':scope > .bloco-wrap'));
+    for (let i = blocos.length - 1; i > 0; i--) {
+      const sep = document.createElement('div');
+      sep.className = 'separador';
+      blocosArea.insertBefore(sep, blocos[i]);
+    }
+  }
+
+  // Padroniza Cartões e Outros em 5 linhas, igual à Residência — só no
+  // perfil único. Não toca em bloco2-* (coluna 2 do perfil padrão), que
+  // continua como está. Clona a última linha do próprio bloco (preserva
+  // as opções do select daquele bloco) e zera os valores. Os 3 botões
+  // injetados por _inicializarLinha (subcategoria/replicar/limpar) são
+  // removidos antes do clone porque foram ligados via addEventListener
+  // na linha original — não sobrevivem ao cloneNode — e reconectados
+  // via _inicializarLinha() só na linha nova, sem reprocessar (e
+  // duplicar o listener de checkbox em) as linhas já existentes.
+  ['bloco1-cart', 'bloco1-emp'].forEach(blocoId => {
+    const bloco = document.querySelector('#' + blocoId + ' .bloco');
+    if (!bloco) return;
+    const linhas = bloco.querySelectorAll(':scope > .linha');
+    if (linhas.length === 0 || linhas.length >= 5) return;
+    const nova = linhas[linhas.length - 1].cloneNode(true);
+    nova.querySelectorAll('.btn-subcategoria-linha, .btn-replicar-linha, .btn-limpar-linha').forEach(b => b.remove());
+    const sel = nova.querySelector('select');
+    const val = nova.querySelector('.val-input');
+    const chk = nova.querySelector('input[type=checkbox]');
+    if (sel) sel.value = '';
+    if (val) val.value = '';
+    if (chk) chk.checked = false;
+    nova.classList.remove('paga');
+    delete nova._subcategoria;
+    bloco.appendChild(nova);
+    _inicializarLinha(nova);
+  });
+}
+
 
 function _inicializarIconePrevisao() {
   const icone = document.getElementById("previsao-pct-info-icon");
@@ -6219,210 +6527,254 @@ function fmtDiarioValor(input) {
 function _diarioPopupInicializar() {
   if (window._diarioPopupJaInicializado) return;
   window._diarioPopupJaInicializado = true;
-  // Garante que colagem no campo de valor também respeita o limite máximo
   const _dvInp = document.getElementById('popup-diario-valor');
   if (_dvInp) {
     _dvInp.addEventListener('paste', function() {
       setTimeout(function() { fmtDiarioValor(_dvInp); }, 0);
     });
   }
-  const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-
-  // Preenche lista de dias (1-31) para ini e fim
-  ['ini','fim'].forEach(function(tipo) {
-    const listEl = document.getElementById('popup-diario-dia-' + tipo + '-list');
-    if (!listEl || listEl.children.length > 0) return;
-    for (let d = 1; d <= 31; d++) {
-      const item = document.createElement('div');
-      item.className = 'popup-meta-drop-item';
-      item.dataset.val = d;
-      item.textContent = String(d).padStart(2,'0');
-      listEl.appendChild(item);
-    }
-  });
-
-  // Preenche lista de meses do início: apenas mês atual da mensal + próximo
-  const mesIniList = document.getElementById('popup-diario-mes-ini-list');
-  mesIniList.innerHTML = '';
-  const mesesPermitidos = [indice % 12, (indice + 1) % 12];
-  mesesPermitidos.forEach(function(idx) {
-    const item = document.createElement('div');
-    item.className = 'popup-meta-drop-item';
-    item.dataset.val = idx;
-    item.textContent = nomesMes[idx];
-    mesIniList.appendChild(item);
-  });
-
-  // Lista de meses do fim começa vazia — preenchida dinamicamente por _diarioAtualizarMesesFim
-  const mesFimList = document.getElementById('popup-diario-mes-fim-list');
-  if (mesFimList) mesFimList.innerHTML = '';
-
-  // Função que recalcula os meses disponíveis no "até" com base na data de início (máx 31 dias)
-  window._diarioAtualizarMesesFim = function() {
-    const diaIniVal = document.getElementById('popup-diario-dia-ini').value;
-    const mesIniVal = document.getElementById('popup-diario-mes-ini').value;
-    if (diaIniVal === '' || mesIniVal === '') return;
-    const anoBase = anoAtual;
-    const dataIni = new Date(anoBase, parseInt(mesIniVal), parseInt(diaIniVal));
-    const dataMax = new Date(dataIni.getTime() + 31 * 24 * 60 * 60 * 1000);
-    const mesFimAtual = document.getElementById('popup-diario-mes-fim').value;
-    const list = document.getElementById('popup-diario-mes-fim-list');
-    list.innerHTML = '';
-    const mesInicio = dataIni.getMonth();
-    const mesFimCalc = dataMax.getMonth();
-    const anoFim = dataMax.getFullYear();
-    // Limitar ao máximo mês atual + 1
-    const limiteMax = (indice + 1) % 12;
-    let mesesValidos = [];
-    if (anoFim === anoBase) {
-      for (let m = mesInicio; m <= mesFimCalc; m++) {
-        if (mesesPermitidos.includes(m)) mesesValidos.push(m);
-      }
-    } else {
-      for (let m = mesInicio; m <= 11; m++) {
-        if (mesesPermitidos.includes(m)) mesesValidos.push(m);
-      }
-      for (let m = 0; m <= mesFimCalc; m++) {
-        if (mesesPermitidos.includes(m)) mesesValidos.push(m);
-      }
-    }
-    // Garante que ao menos o mês de início aparece
-    if (!mesesValidos.includes(mesInicio)) mesesValidos.unshift(mesInicio);
-    mesesValidos.forEach(function(m) {
-      const item = document.createElement('div');
-      item.className = 'popup-meta-drop-item';
-      item.dataset.val = m;
-      item.textContent = nomesMes[m];
-      if (String(m) === mesFimAtual) item.classList.add('ativo');
-      list.appendChild(item);
-    });
-    // Se o mês fim selecionado não é mais válido, resetar
-    if (mesFimAtual !== '' && !mesesValidos.includes(parseInt(mesFimAtual))) {
-      document.getElementById('popup-diario-mes-fim').value = '';
-      document.getElementById('popup-diario-mes-fim-display').value = '';
-      document.getElementById('popup-diario-mes-fim-display').placeholder = 'Mês';
-    }
-  };
-
-  // Configura cada campo como input com autocomplete + dropdown
-  [
-    { displayId: 'popup-diario-dia-ini-display',  listId: 'popup-diario-dia-ini-list',  hiddenId: 'popup-diario-dia-ini',  isDia: true,  isFim: false },
-    { displayId: 'popup-diario-mes-ini-display',  listId: 'popup-diario-mes-ini-list',  hiddenId: 'popup-diario-mes-ini',  isDia: false, isFim: false },
-    { displayId: 'popup-diario-dia-fim-display',  listId: 'popup-diario-dia-fim-list',  hiddenId: 'popup-diario-dia-fim',  isDia: true,  isFim: true  },
-    { displayId: 'popup-diario-mes-fim-display',  listId: 'popup-diario-mes-fim-list',  hiddenId: 'popup-diario-mes-fim',  isDia: false, isFim: true  },
-  ].forEach(function(cfg) {
-    const display = document.getElementById(cfg.displayId);
-    const list    = document.getElementById(cfg.listId);
-    const hidden  = document.getElementById(cfg.hiddenId);
-    if (!display || !list || !hidden) return;
-
-    var _digitando = false;
-
-    function abrirLista(filtrar) {
-      // Só filtra se o usuário está digitando ativamente
-      const q = (filtrar && _digitando) ? display.value.toLowerCase().trim() : '';
-      list.querySelectorAll('.popup-meta-drop-item').forEach(function(item) {
-        const match = item.textContent.toLowerCase().includes(q) || q === '';
-        item.style.display = match ? '' : 'none';
-      });
-      document.querySelectorAll('#popup-diario .popup-meta-drop-list.open').forEach(function(el) {
-        if (el !== list) el.classList.remove('open');
-      });
-      list.classList.add('open');
-    }
-
-    display.addEventListener('focus', function() {
-      _digitando = false;
-      abrirLista(false);
-    });
-    display.addEventListener('input', function() {
-      // Filtra caracteres inválidos na digitação
-      if (cfg.isDia) {
-        // Campos de dia: apenas dígitos
-        const limpo = display.value.replace(/\D/g, '');
-        if (display.value !== limpo) { display.value = limpo; }
-      } else {
-        // Campos de mês: apenas letras e espaços
-        const limpo = display.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
-        if (display.value !== limpo) { display.value = limpo; }
-      }
-      _digitando = true;
-      hidden.value = '';
-      list.querySelectorAll('.popup-meta-drop-item').forEach(function(i){ i.classList.remove('ativo'); });
-      // Para campo de dia: se digitou número válido, já seleciona
-      if (cfg.isDia) {
-        const num = parseInt(display.value);
-        if (!isNaN(num) && num >= 1 && num <= 31) {
-          const match = list.querySelector('.popup-meta-drop-item[data-val="' + num + '"]');
-          if (match) {
-            hidden.value = num;
-            match.classList.add('ativo');
-            if (!cfg.isFim) window._diarioAtualizarMesesFim && window._diarioAtualizarMesesFim();
-          }
-        }
-      }
-      abrirLista(true);
-    });
-    display.addEventListener('click', function(e) { e.stopPropagation(); _digitando = false; abrirLista(false); });
-
-    list.addEventListener('click', function(e) {
-      const item = e.target.closest('.popup-meta-drop-item');
-      if (!item) return;
-      const val = item.dataset.val;
-      hidden.value = val;
-      display.value = cfg.isDia ? String(parseInt(val)).padStart(2,'0') : nomesMes[parseInt(val)];
-      list.querySelectorAll('.popup-meta-drop-item').forEach(function(i){ i.classList.remove('ativo'); });
-      item.classList.add('ativo');
-      list.classList.remove('open');
-      // Atualiza meses do fim sempre que início muda
-      if (!cfg.isFim) window._diarioAtualizarMesesFim && window._diarioAtualizarMesesFim();
-    });
-  });
-
-  document.addEventListener('click', function() {
-    document.querySelectorAll('#popup-diario .popup-meta-drop-list.open').forEach(function(el) {
-      el.classList.remove('open');
-    });
-  });
 }
 
-function _diarioDropdownSet(displayId, listId, hiddenId, val, label) {
-  const display = document.getElementById(displayId);
-  const list    = document.getElementById(listId);
-  const hidden  = document.getElementById(hiddenId);
-  if (!display || !hidden) return;
-  hidden.value = val;
-  // Suporta tanto input quanto div
-  if (display.tagName === 'INPUT') {
-    display.value = label;
+// ── ESTADO DO CALENDÁRIO CUSTOMIZADO ──
+var _dcal = {
+  el:       null,   // elemento DOM do calendário
+  campo:    null,   // 'ini' ou 'fim'
+  ano:      0,
+  mes:      0,      // 0-based
+  valIni:   '',     // ISO string do campo ini
+  valFim:   '',     // ISO string do campo fim
+  minDate:  '',     // ISO string mínima permitida para o campo atual
+  maxDate:  '',     // ISO string máxima permitida para o campo atual
+};
+
+function _dcalPad(n) { return String(n).padStart(2,'0'); }
+function _dcalIso(ano, mes, dia) { return ano + '-' + _dcalPad(mes+1) + '-' + _dcalPad(dia); }
+function _dcalParse(iso) {
+  if (!iso) return null;
+  const p = iso.split('-');
+  return p.length === 3 ? { ano: +p[0], mes: +p[1]-1, dia: +p[2] } : null;
+}
+function _dcalFormataBR(iso) {
+  const p = _dcalParse(iso);
+  return p ? _dcalPad(p.dia) + '/' + _dcalPad(p.mes+1) + '/' + p.ano : null;
+}
+
+function _diarioSincronizarDisplay(fieldId) {
+  const val  = fieldId === 'popup-diario-date-ini' ? _dcal.valIni : _dcal.valFim;
+  const disp = document.getElementById(fieldId + '-display');
+  if (!disp) return;
+  const fmt = _dcalFormataBR(val);
+  if (fmt) { disp.textContent = fmt; disp.classList.remove('vazio'); }
+  else      { disp.textContent = 'Selecionar'; disp.classList.add('vazio'); }
+}
+
+function _diarioFormatarDataDisplay(iso) { return _dcalFormataBR(iso); }
+
+function _diarioDateGetParts(fieldId) {
+  const val = fieldId === 'popup-diario-date-ini' ? _dcal.valIni : _dcal.valFim;
+  return _dcalParse(val);
+}
+
+function _diarioDateSet(fieldId, ano, mes, dia) {
+  const iso = _dcalIso(ano, mes, dia);
+  if (fieldId === 'popup-diario-date-ini') _dcal.valIni = iso;
+  else _dcal.valFim = iso;
+  _diarioSincronizarDisplay(fieldId);
+}
+
+function _diarioDateReset(fieldId) {
+  if (fieldId === 'popup-diario-date-ini') _dcal.valIni = '';
+  else _dcal.valFim = '';
+  _diarioSincronizarDisplay(fieldId);
+}
+
+// Calcula limites (minDate/maxDate) para cada campo
+function _diarioAplicarConstraintsDatas() {
+  const anoIniBase = anoAtual + Math.floor(indice / 12);
+  const mesIniBase = indice % 12;
+  const mesFimBase = (indice + 1) % 12;
+  const anoFimBase = anoAtual + Math.floor((indice + 1) / 12);
+  const ultimoDiaMesFim = new Date(anoFimBase, mesFimBase + 1, 0).getDate();
+
+  _dcal.minIni = _dcalIso(anoIniBase, mesIniBase, 1);
+  _dcal.maxIni = _dcalIso(anoFimBase, mesFimBase, ultimoDiaMesFim);
+
+  // Pré-preenche início se vazio
+  if (!_dcal.valIni) {
+    const hoje = new Date();
+    const hojeStr = _dcalIso(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    _dcal.valIni = (hojeStr >= _dcal.minIni && hojeStr <= _dcal.maxIni) ? hojeStr : _dcal.minIni;
+    _diarioSincronizarDisplay('popup-diario-date-ini');
+  }
+
+  _diarioAtualizarConstraintsFim();
+}
+
+function _diarioAtualizarConstraintsFim() {
+  const mesFimBase = (indice + 1) % 12;
+  const anoFimBase = anoAtual + Math.floor((indice + 1) / 12);
+  const ultimoDiaMesFim = new Date(anoFimBase, mesFimBase + 1, 0).getDate();
+  const maxAbsoluto = _dcalIso(anoFimBase, mesFimBase, ultimoDiaMesFim);
+  const anoIniBase  = anoAtual + Math.floor(indice / 12);
+  const mesIniBase  = indice % 12;
+
+  if (_dcal.valIni) {
+    const pi = _dcalParse(_dcal.valIni);
+    const dataIni  = new Date(pi.ano, pi.mes, pi.dia);
+    const dataMax  = new Date(dataIni.getTime() + 31 * 24 * 60 * 60 * 1000);
+    const dataLim  = new Date(anoFimBase, mesFimBase + 1, 0);
+    const dataFimMax = dataMax < dataLim ? dataMax : dataLim;
+    _dcal.minFim = _dcal.valIni;
+    _dcal.maxFim = _dcalIso(dataFimMax.getFullYear(), dataFimMax.getMonth(), dataFimMax.getDate());
+    if (_dcal.valFim && (_dcal.valFim < _dcal.minFim || _dcal.valFim > _dcal.maxFim)) {
+      _dcal.valFim = '';
+      _diarioSincronizarDisplay('popup-diario-date-fim');
+    }
   } else {
-    display.textContent = label;
-    display.classList.remove('vazio');
+    _dcal.minFim = _dcalIso(anoIniBase, mesIniBase, 1);
+    _dcal.maxFim = maxAbsoluto;
   }
-  if (list) {
-    list.querySelectorAll('.popup-meta-drop-item').forEach(function(i){
-      i.classList.toggle('ativo', i.dataset.val == val);
+}
+
+// Abre o calendário customizado para 'ini' ou 'fim'
+function _diarioAbrirPicker(campo) {
+  _dcal.campo = campo;
+
+  // Determina min/max para este campo
+  const minDate = campo === 'ini' ? _dcal.minIni : _dcal.minFim;
+  const maxDate = campo === 'ini' ? _dcal.maxIni : _dcal.maxFim;
+  _dcal.minDate = minDate || '';
+  _dcal.maxDate = maxDate || '';
+
+  // Mes de visualização: parte do valor atual ou do min
+  const valAtual = campo === 'ini' ? _dcal.valIni : _dcal.valFim;
+  const ref = _dcalParse(valAtual) || _dcalParse(minDate);
+  _dcal.ano = ref ? ref.ano : new Date().getFullYear();
+  _dcal.mes = ref ? ref.mes : new Date().getMonth();
+
+  // Marca wrap como aberto
+  document.querySelectorAll('.diario-date-wrap.aberto').forEach(function(w){ w.classList.remove('aberto'); });
+  const wrapId = campo === 'ini' ? 'diario-date-wrap-ini' : 'diario-date-wrap-fim';
+  const wrap = document.getElementById(wrapId);
+  if (wrap) wrap.classList.add('aberto');
+
+  // Cria ou reutiliza o elemento
+  if (!_dcal.el) {
+    _dcal.el = document.createElement('div');
+    _dcal.el.className = 'dcal';
+    document.body.appendChild(_dcal.el);
+    // Fecha ao clicar fora
+    document.addEventListener('mousedown', function(e) {
+      if (_dcal.el && !_dcal.el.contains(e.target)) {
+        const w2 = document.getElementById('diario-date-wrap-ini');
+        const w3 = document.getElementById('diario-date-wrap-fim');
+        if (w2 && w2.contains(e.target)) return;
+        if (w3 && w3.contains(e.target)) return;
+        _dcalFechar();
+      }
     });
   }
-  // Após setar início, atualiza meses do fim
-  if ((hiddenId === 'popup-diario-dia-ini' || hiddenId === 'popup-diario-mes-ini') && window._diarioAtualizarMesesFim) {
-    window._diarioAtualizarMesesFim();
-  }
+
+  _dcalRenderizar();
+
+  // Posiciona abaixo do wrap
+  requestAnimationFrame(function() {
+    if (!wrap || !_dcal.el) return;
+    const r    = wrap.getBoundingClientRect();
+    const zoom = window._getCssZoom ? _getCssZoom() : 1;
+    const calW = 240;
+    const top  = r.bottom / zoom + 6;
+    let   left = r.left   / zoom;
+    if (left + calW > window.innerWidth / zoom - 8) left = window.innerWidth / zoom - calW - 8;
+    _dcal.el.style.top  = top  + 'px';
+    _dcal.el.style.left = left + 'px';
+    _dcal.el.classList.add('visivel');
+  });
 }
 
-function _diarioDropdownReset(displayId, hiddenId, placeholder) {
-  const display = document.getElementById(displayId);
-  const hidden  = document.getElementById(hiddenId);
-  if (display) {
-    if (display.tagName === 'INPUT') { display.value = ''; display.placeholder = placeholder; }
-    else { display.textContent = placeholder; display.classList.add('vazio'); }
-  }
-  if (hidden) hidden.value = '';
+function _dcalFechar() {
+  if (!_dcal.el) return;
+  _dcal.el.classList.remove('visivel');
+  document.querySelectorAll('.diario-date-wrap.aberto').forEach(function(w){ w.classList.remove('aberto'); });
 }
 
-function _diarioGetDropVal(hiddenId) {
-  const el = document.getElementById(hiddenId);
-  return el ? el.value : '';
+function _dcalRenderizar() {
+  if (!_dcal.el) return;
+  const nomesMes = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const hoje = new Date();
+  const hojeIso = _dcalIso(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  const valSel  = _dcal.campo === 'ini' ? _dcal.valIni : _dcal.valFim;
+
+  // Dias da semana: D S T Q Q S S
+  const dows = ['D','S','T','Q','Q','S','S'];
+
+  // Dia 1 do mês sendo exibido
+  const primeiroDia = new Date(_dcal.ano, _dcal.mes, 1);
+  const totalDias   = new Date(_dcal.ano, _dcal.mes + 1, 0).getDate();
+  const inicioGrid  = primeiroDia.getDay(); // 0=Dom
+
+  // Verificar se pode navegar
+  const minP = _dcalParse(_dcal.minDate);
+  const maxP = _dcalParse(_dcal.maxDate);
+  const podePrev = minP ? (_dcal.ano > minP.ano || (_dcal.ano === minP.ano && _dcal.mes > minP.mes)) : true;
+  const podeProx = maxP ? (_dcal.ano < maxP.ano || (_dcal.ano === maxP.ano && _dcal.mes < maxP.mes)) : true;
+
+  let html = '<div class="dcal-header">'
+    + '<span class="dcal-mes-label">' + nomesMes[_dcal.mes] + ' de ' + _dcal.ano + '</span>'
+    + '<div class="dcal-nav">'
+    + '<button onclick="_dcalNavMes(-1)"' + (podePrev ? '' : ' disabled') + '>'
+    + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>'
+    + '</button>'
+    + '<button onclick="_dcalNavMes(1)"' + (podeProx ? '' : ' disabled') + '>'
+    + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>'
+    + '</button>'
+    + '</div></div>'
+    + '<div class="dcal-grid">';
+
+  // Cabeçalho dias da semana
+  dows.forEach(function(d) { html += '<div class="dcal-dow">' + d + '</div>'; });
+
+  // Células vazias do início
+  for (var i = 0; i < inicioGrid; i++) {
+    html += '<div class="dcal-day outro-mes"></div>';
+  }
+
+  // Dias do mês
+  for (var d = 1; d <= totalDias; d++) {
+    const iso = _dcalIso(_dcal.ano, _dcal.mes, d);
+    const desab = (_dcal.minDate && iso < _dcal.minDate) || (_dcal.maxDate && iso > _dcal.maxDate);
+    const sel   = iso === valSel;
+    const ehHoje = iso === hojeIso;
+    let cls = 'dcal-day';
+    if (desab) cls += ' desabilitado';
+    else if (sel) cls += ' selecionado';
+    else if (ehHoje) cls += ' hoje';
+    const onclick = desab ? '' : ' onclick="_dcalSelecionarDia(\'' + iso + '\')"';
+    html += '<div class="' + cls + '"' + onclick + '>' + d + '</div>';
+  }
+
+  html += '</div>';
+  _dcal.el.innerHTML = html;
+}
+
+function _dcalNavMes(delta) {
+  _dcal.mes += delta;
+  if (_dcal.mes < 0)  { _dcal.mes = 11; _dcal.ano--; }
+  if (_dcal.mes > 11) { _dcal.mes = 0;  _dcal.ano++; }
+  _dcalRenderizar();
+}
+
+function _dcalSelecionarDia(iso) {
+  if (_dcal.campo === 'ini') {
+    _dcal.valIni = iso;
+    _diarioSincronizarDisplay('popup-diario-date-ini');
+    _diarioAtualizarConstraintsFim();
+    _diarioSincronizarDisplay('popup-diario-date-fim');
+  } else {
+    _dcal.valFim = iso;
+    _diarioSincronizarDisplay('popup-diario-date-fim');
+  }
+  _dcalFechar();
 }
 
 let _diarioSegundoSlot = false; // true apenas quando cadastrando o segundo slot de um grupo existente
@@ -6434,10 +6786,9 @@ function _abrirPopupDiarioTour() {
   _diarioSegundoSlot = false;
   window._diarioPopupJaInicializado = false;
   _diarioPopupInicializar();
-  _diarioDropdownReset('popup-diario-dia-ini-display','popup-diario-dia-ini','Dia');
-  _diarioDropdownReset('popup-diario-mes-ini-display','popup-diario-mes-ini','Mês');
-  _diarioDropdownReset('popup-diario-dia-fim-display','popup-diario-dia-fim','Dia');
-  _diarioDropdownReset('popup-diario-mes-fim-display','popup-diario-mes-fim','Mês');
+  _diarioDateReset('popup-diario-date-ini');
+  _diarioDateReset('popup-diario-date-fim');
+  _diarioAplicarConstraintsDatas();
   document.getElementById('popup-diario-valor').value = '';
   document.getElementById('popup-diario-erro').style.display = 'none';
   document.getElementById('popup-diario-titulo').textContent = 'Cadastrar período';
@@ -6457,10 +6808,9 @@ function abrirPopupDiarioCadastro(slot, segundoSlot) {
   _diarioSegundoSlot = !!segundoSlot;
   window._diarioPopupJaInicializado = false;
   _diarioPopupInicializar();
-  _diarioDropdownReset('popup-diario-dia-ini-display','popup-diario-dia-ini','Dia');
-  _diarioDropdownReset('popup-diario-mes-ini-display','popup-diario-mes-ini','Mês');
-  _diarioDropdownReset('popup-diario-dia-fim-display','popup-diario-dia-fim','Dia');
-  _diarioDropdownReset('popup-diario-mes-fim-display','popup-diario-mes-fim','Mês');
+  _diarioDateReset('popup-diario-date-ini');
+  _diarioDateReset('popup-diario-date-fim');
+  _diarioAplicarConstraintsDatas();
   document.getElementById('popup-diario-valor').value = '';
   document.getElementById('popup-diario-erro').style.display = 'none';
   document.getElementById('popup-diario-titulo').textContent = 'Cadastrar período';
@@ -6481,11 +6831,9 @@ function abrirPopupDiarioEditarById(periodoId) {
   _diarioSlotEditando = periodo.slot;
   window._diarioPopupJaInicializado = false;
   _diarioPopupInicializar();
-  const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  _diarioDropdownSet('popup-diario-dia-ini-display','popup-diario-dia-ini-list','popup-diario-dia-ini', periodo.diaIni, String(periodo.diaIni).padStart(2,'0'));
-  _diarioDropdownSet('popup-diario-mes-ini-display','popup-diario-mes-ini-list','popup-diario-mes-ini', periodo.mesIni, nomesMes[periodo.mesIni]);
-  _diarioDropdownSet('popup-diario-dia-fim-display','popup-diario-dia-fim-list','popup-diario-dia-fim', periodo.diaFim, String(periodo.diaFim).padStart(2,'0'));
-  _diarioDropdownSet('popup-diario-mes-fim-display','popup-diario-mes-fim-list','popup-diario-mes-fim', periodo.mesFim, nomesMes[periodo.mesFim]);
+  _diarioDateSet('popup-diario-date-ini', periodo.anoIni, periodo.mesIni, periodo.diaIni);
+  _diarioDateSet('popup-diario-date-fim', periodo.anoFim, periodo.mesFim, periodo.diaFim);
+  _diarioAplicarConstraintsDatas();
   document.getElementById('popup-diario-valor').value = brl(periodo.valor);
   document.getElementById('popup-diario-erro').style.display = 'none';
   document.getElementById('popup-diario-titulo').textContent = 'Editar período';
@@ -6512,11 +6860,9 @@ function abrirPopupDiarioEditar(slot) {
   _diarioSlotEditando = slot;
   window._diarioPopupJaInicializado = false;
   _diarioPopupInicializar();
-  const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  _diarioDropdownSet('popup-diario-dia-ini-display','popup-diario-dia-ini-list','popup-diario-dia-ini', periodo.diaIni, String(periodo.diaIni).padStart(2,'0'));
-  _diarioDropdownSet('popup-diario-mes-ini-display','popup-diario-mes-ini-list','popup-diario-mes-ini', periodo.mesIni, nomesMes[periodo.mesIni]);
-  _diarioDropdownSet('popup-diario-dia-fim-display','popup-diario-dia-fim-list','popup-diario-dia-fim', periodo.diaFim, String(periodo.diaFim).padStart(2,'0'));
-  _diarioDropdownSet('popup-diario-mes-fim-display','popup-diario-mes-fim-list','popup-diario-mes-fim', periodo.mesFim, nomesMes[periodo.mesFim]);
+  _diarioDateSet('popup-diario-date-ini', periodo.anoIni, periodo.mesIni, periodo.diaIni);
+  _diarioDateSet('popup-diario-date-fim', periodo.anoFim, periodo.mesFim, periodo.diaFim);
+  _diarioAplicarConstraintsDatas();
   document.getElementById('popup-diario-valor').value = brl(periodo.valor);
   document.getElementById('popup-diario-erro').style.display = 'none';
   document.getElementById('popup-diario-titulo').textContent = 'Editar período';
@@ -6541,6 +6887,7 @@ function _abrirPopupDiario() {
 }
 
 function fecharPopupDiario() {
+  _dcalFechar();
   const overlay = document.getElementById('popup-diario-overlay');
   const popup   = document.getElementById('popup-diario');
   popup.style.opacity = '0';
@@ -6552,20 +6899,21 @@ function fecharPopupDiario() {
 function salvarPopupDiario() {
   const erroEl  = document.getElementById('popup-diario-erro');
   erroEl.style.display = 'none';
-  const anoSistema = new Date().getFullYear();
-  const diaIniStr = _diarioGetDropVal('popup-diario-dia-ini');
-  const mesIniStr = _diarioGetDropVal('popup-diario-mes-ini');
-  const diaFimStr = _diarioGetDropVal('popup-diario-dia-fim');
-  const mesFimStr = _diarioGetDropVal('popup-diario-mes-fim');
-  const diaIni  = diaIniStr !== '' ? parseInt(diaIniStr) : 0;
-  const mesIni  = mesIniStr !== '' ? parseInt(mesIniStr) : -1;
-  const diaFim  = diaFimStr !== '' ? parseInt(diaFimStr) : 0;
-  const mesFim  = mesFimStr !== '' ? parseInt(mesFimStr) : -1;
-  const anoIni  = anoSistema;
-  const anoFim  = mesFim < mesIni ? anoSistema + 1 : anoSistema;
   const valor   = num(document.getElementById('popup-diario-valor').value);
 
   function erro(msg) { erroEl.textContent = msg; erroEl.style.display = 'block'; }
+
+  const partsIni = _diarioDateGetParts('popup-diario-date-ini');
+  const partsFim = _diarioDateGetParts('popup-diario-date-fim');
+
+  if (!partsIni || !partsFim || valor <= 0) { erro('Preencha todos os campos corretamente.'); return; }
+
+  const diaIni = partsIni.dia;
+  const mesIni = partsIni.mes;
+  const anoIni = partsIni.ano;
+  const diaFim = partsFim.dia;
+  const mesFim = partsFim.mes;
+  const anoFim = partsFim.ano;
 
   const iniDate = _diarioParseData(anoIni, mesIni, diaIni);
   const fimDate = _diarioParseData(anoFim, mesFim, diaFim);
@@ -6575,7 +6923,6 @@ function salvarPopupDiario() {
   const editId   = tituloEl.dataset.editId;
   const isEdit   = !!editId;
 
-  if (!diaIni || mesIni < 0 || !diaFim || mesFim < 0 || valor <= 0) { erro('Preencha todos os campos corretamente.'); return; }
   if (_diarioEntradaSelecionada === 0) { erro('Selecione a entrada vinculada a este período.'); return; }
   // Verifica se já existe período neste mês com essa entrada (exceto ao editar)
   const _entradaOcupada = _diarioEntradaJaUsada(_diarioEntradaSelecionada);
@@ -7257,8 +7604,8 @@ const _tourPassosDiario = [
       if (btnFechar)    { btnFechar.style.display = 'none'; self._btnFechar = btnFechar; }
       self._popup = popup;
       _tourTimeout(function() {
-        const alvo = document.getElementById('popup-diario-dia-ini-wrap') &&
-                     document.getElementById('popup-diario-dia-ini-wrap').closest('.popup-meta-group');
+        const alvo = document.getElementById('popup-diario-date-ini') &&
+                     document.getElementById('popup-diario-date-ini').closest('.popup-meta-group');
         if (!alvo) { _mostrarBalao(); return; }
         svg.querySelectorAll('.tour-dyn').forEach(e => e.remove());
         const z = _getCssZoom(), r = alvo.getBoundingClientRect(), pad = 8;
@@ -7835,6 +8182,9 @@ function fecharPopupTour() {
 function confirmarFecharMes() {
   salvarMes(); // garante que tudo está salvo antes de fechar
 
+  // Coleta dados do mês atual ANTES de fechar (para o resumo)
+  const _resumoDados = _coletarDadosResumoMes(anoAtual, indice);
+
   // Fecha em cascata todos os meses anteriores que ainda estão abertos
   const anosRange = [2026, 2027, 2028, 2029, 2030];
   for (const a of anosRange) {
@@ -7863,7 +8213,195 @@ function confirmarFecharMes() {
     trocarAba('planejamento');
   }
 
-  exibirToastInfo(meses[indice] + " fechado. Edições bloqueadas.", 5000);
+  // Exibe o popup de resumo após o fechamento
+  setTimeout(function() { _abrirPopupResumoMes(_resumoDados); }, 280);
+}
+
+/* ── Coleta os dados do mês para o popup de resumo ── */
+function _coletarDadosResumoMes(ano, mes) {
+  const chave = 'planejamento_' + ano + '_' + mes;
+  const raw   = localStorage.getItem(chave);
+  let dados   = {};
+  try { dados = raw ? JSON.parse(raw) : {}; } catch(e) {}
+
+  const sal1 = num(dados.sal1 || '');
+  const sal2 = num(dados.sal2 || '');
+
+  // Extras de salário
+  const extrasRaw = localStorage.getItem('extras_sal_' + ano + '_' + mes);
+  let extrasSoma  = 0;
+  if (extrasRaw) {
+    try {
+      const ext = JSON.parse(extrasRaw);
+      [1, 2].forEach(function(e) {
+        const lista   = ext[String(e)] || [];
+        const isSomar = ext['info' + e] === true;
+        if (isSomar) lista.forEach(function(x) { extrasSoma += num(x.valor || ''); });
+      });
+    } catch(e) {}
+  }
+  const faturado = sal1 + sal2 + extrasSoma;
+
+  // Gastos fixos
+  let gastos = 0;
+  Object.keys(dados).forEach(function(k) {
+    if (k.endsWith('_val')) gastos += num(dados[k] || '');
+  });
+
+  // Alocações do diário
+  try {
+    const alocRaw = localStorage.getItem('diario_alocacao_v1');
+    if (alocRaw) {
+      const alocAll = JSON.parse(alocRaw);
+      const alocMes = alocAll[ano + '_' + mes] || {};
+      gastos += parseFloat(alocMes['1'] || 0) + parseFloat(alocMes['2'] || 0);
+    }
+  } catch(e) {}
+
+  const saldo = faturado - gastos;
+
+  // Depósito na reserva deste mês
+  let depositoReserva = 0;
+  try {
+    const blocosRaw = localStorage.getItem('mov_previsao_blocos_' + ano + '_' + mes);
+    if (blocosRaw) {
+      const bl = JSON.parse(blocosRaw);
+      depositoReserva = Math.max(0, (parseFloat(bl.depB1 || 0) + parseFloat(bl.depB2 || 0)) - (parseFloat(bl.retB1 || 0) + parseFloat(bl.retB2 || 0)));
+    } else {
+      depositoReserva = parseFloat(localStorage.getItem('dep_reserva_' + ano + '_' + mes) || '0');
+    }
+  } catch(e) {}
+
+  // Depósito em metas deste mês
+  let depositoMeta = 0;
+  _META_KEYS.forEach(function(_, si) {
+    depositoMeta += parseFloat(localStorage.getItem('dep_meta_' + si + '_' + ano + '_' + mes) || '0');
+  });
+
+  // Dados do mês anterior para comparação
+  let anterior = null;
+  let anoAnt = ano, mesAnt = mes - 1;
+  if (mesAnt < 0) { mesAnt = 11; anoAnt--; }
+  const rawAnt = localStorage.getItem('planejamento_' + anoAnt + '_' + mesAnt);
+  if (rawAnt && mesFechado(anoAnt, mesAnt)) {
+    try {
+      const dAnt  = JSON.parse(rawAnt);
+      const s1ant = num(dAnt.sal1 || '');
+      const s2ant = num(dAnt.sal2 || '');
+      const extAntRaw = localStorage.getItem('extras_sal_' + anoAnt + '_' + mesAnt);
+      let extAntSoma = 0;
+      if (extAntRaw) {
+        const extA = JSON.parse(extAntRaw);
+        [1, 2].forEach(function(e) {
+          const lista = extA[String(e)] || [];
+          if (extA['info' + e] === true) lista.forEach(function(x) { extAntSoma += num(x.valor || ''); });
+        });
+      }
+      const fatAnt = s1ant + s2ant + extAntSoma;
+      let gasAnt = 0;
+      Object.keys(dAnt).forEach(function(k) { if (k.endsWith('_val')) gasAnt += num(dAnt[k] || ''); });
+      try {
+        const alocRawA = localStorage.getItem('diario_alocacao_v1');
+        if (alocRawA) {
+          const alocA = JSON.parse(alocRawA)[anoAnt + '_' + mesAnt] || {};
+          gasAnt += parseFloat(alocA['1'] || 0) + parseFloat(alocA['2'] || 0);
+        }
+      } catch(e) {}
+      anterior = { faturado: fatAnt, gastos: gasAnt, saldo: fatAnt - gasAnt, mes: mesAnt, ano: anoAnt };
+    } catch(e) {}
+  }
+
+  return { faturado, gastos, saldo, depositoReserva, depositoMeta, mes, ano, anterior };
+}
+
+/* ── Abre o popup de resumo com os dados coletados ── */
+function _abrirPopupResumoMes(d) {
+  const overlay = document.getElementById('popup-resumo-mes-overlay');
+  const popup   = document.getElementById('popup-resumo-mes');
+  if (!overlay || !popup) return;
+
+  const MESES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  // Título
+  document.getElementById('resumo-titulo-mes').textContent = MESES_NOMES[d.mes] + ' ' + d.ano;
+
+  // Métricas principais
+  document.getElementById('resumo-faturado').textContent = brl(d.faturado);
+  document.getElementById('resumo-gastos').textContent   = brl(d.gastos);
+
+  const saldoEl = document.getElementById('resumo-saldo');
+  saldoEl.textContent = brl(Math.abs(d.saldo));
+  saldoEl.className   = 'resumo-metrica-val ' + (d.saldo >= 0 ? 'azul' : 'vermelho');
+
+  // Barra de proporção
+  const pctGasto  = d.faturado > 0 ? Math.min((d.gastos / d.faturado) * 100, 100) : 0;
+  const pctSobrou = Math.max(100 - pctGasto, 0);
+  setTimeout(function() {
+    document.getElementById('resumo-barra-gasto').style.width = pctGasto.toFixed(1) + '%';
+  }, 80);
+  document.getElementById('resumo-pct-gasto').textContent  = pctGasto.toFixed(0) + '% comprometido';
+  const pctSobrouEl = document.getElementById('resumo-pct-sobrou');
+  pctSobrouEl.textContent = pctSobrou.toFixed(0) + '% livre';
+  pctSobrouEl.style.color = pctSobrou >= 20 ? '#16a34a' : (pctSobrou > 0 ? '#d97706' : '#c0392b');
+
+  // Comparação com mês anterior
+  const compEl = document.getElementById('resumo-comparacao');
+  if (d.anterior) {
+    const diffGastos = d.gastos - d.anterior.gastos;
+    const diffSaldo  = d.saldo  - d.anterior.saldo;
+    const seta = function(v) { return v > 0 ? '▲' : (v < 0 ? '▼' : '—'); };
+    const cor  = function(v, inverso) {
+      if (v === 0) return '#8a9cc8';
+      const positivo = inverso ? v < 0 : v > 0;
+      return positivo ? '#16a34a' : '#c0392b';
+    };
+    const compGastosEl = document.getElementById('resumo-comp-gastos');
+    const compSaldoEl  = document.getElementById('resumo-comp-saldo');
+    const nomeMesAnt   = MESES_NOMES[d.anterior.mes];
+
+    compGastosEl.innerHTML = `<span style="color:${cor(diffGastos, true)}">${seta(diffGastos)} ${brl(Math.abs(diffGastos))}</span> <span style="font-size:11px;color:#8a9cc8;font-weight:400;">vs. ${nomeMesAnt}</span>`;
+    compSaldoEl.innerHTML  = `<span style="color:${cor(diffSaldo, false)}">${seta(diffSaldo)} ${brl(Math.abs(diffSaldo))}</span> <span style="font-size:11px;color:#8a9cc8;font-weight:400;">vs. ${nomeMesAnt}</span>`;
+    compEl.style.display = '';
+  } else {
+    compEl.style.display = 'none';
+  }
+
+  // Reserva / meta guardada
+  const reservaRow = document.getElementById('resumo-reserva-row');
+  const reservaConteudo = document.getElementById('resumo-reserva-conteudo');
+  if (d.depositoReserva > 0 || d.depositoMeta > 0) {
+    let linhas = [];
+    if (d.depositoReserva > 0) linhas.push('<span style="display:inline-flex;align-items:center;gap:6px;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a16207" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="16" rx="2"/><circle cx="12" cy="11" r="3.5"/><circle cx="12" cy="11" r="1.2" fill="#a16207" stroke="none"/></svg>Reserva de emergência: <strong>' + brl(d.depositoReserva) + '</strong></span>');
+    if (d.depositoMeta > 0)    linhas.push('<span style="display:inline-flex;align-items:center;gap:6px;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1c3f91" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="#1c3f91" stroke="none"/></svg>Metas: <strong>' + brl(d.depositoMeta) + '</strong></span>');
+    reservaConteudo.innerHTML = linhas.join('<br>');
+    reservaRow.style.display = '';
+  } else {
+    reservaRow.style.display = 'none';
+  }
+
+  overlay.style.display = 'block';
+  popup.style.display   = 'block';
+  requestAnimationFrame(function() {
+    popup.style.opacity       = '1';
+    popup.style.transform     = 'translate(-50%,-50%) scale(1)';
+    popup.style.pointerEvents = 'auto';
+  });
+}
+
+function fecharPopupResumoMes() {
+  const overlay = document.getElementById('popup-resumo-mes-overlay');
+  const popup   = document.getElementById('popup-resumo-mes');
+  if (!popup) return;
+  popup.style.opacity       = '0';
+  popup.style.transform     = 'translate(-50%,-50%) scale(0.94)';
+  popup.style.pointerEvents = 'none';
+  // Reseta barra para próxima abertura
+  const barra = document.getElementById('resumo-barra-gasto');
+  if (barra) barra.style.width = '0%';
+  setTimeout(function() {
+    popup.style.display   = 'none';
+    if (overlay) overlay.style.display = 'none';
+  }, 250);
 }
 
 /* ── Popup Reabrir Mês ── */
@@ -8184,6 +8722,9 @@ function mudarAba(aba) {
       el.style.display    = (el === elDiario || el === elAnual) ? 'block' : 'flex';
     });
     if (aba === 'planejamento' && elBanner) elBanner.style.display = '';
+
+    // Bloqueia scroll do body na página anual
+    document.body.classList.toggle('pagina-anual', aba === 'anual');
 
     // Carrega dados da view destino
     if (aba === 'diario')       renderizarDiario();
@@ -8632,7 +9173,7 @@ function confirmarExcluirMeta() {
 })();
 
 function _authMostrarPainel(id) {
-  ['login-panel','cadastro-panel','recuperar-panel'].forEach(p => {
+  ['login-panel','cadastro-panel','recuperar-panel','perfil-renda-panel'].forEach(p => {
     const el = document.getElementById(p);
     if (el) el.style.display = 'none';
   });
@@ -8649,6 +9190,33 @@ function mostrarLogin()          { _authMostrarPainel('login-panel'); }
 function mostrarCadastro()       { _authMostrarPainel('cadastro-panel'); }
 function mostrarRecuperarSenha() { _authMostrarPainel('recuperar-panel'); }
 
+/* ── PERFIL DE RENDA (duas entradas vs entrada única) ──
+ *  Chave: 'planova_perfil_renda' → 'duas' | 'unica'
+ *  Definido uma única vez, no primeiro acesso (pós-cadastro,
+ *  ou no login se por algum motivo ainda não tiver sido definido).
+ *  Não há fluxo de troca posterior — é definitivo. ── */
+function _perfilRendaDefinido() {
+  return !!localStorage.getItem('planova_perfil_renda');
+}
+
+function _perfilRendaSelecionar(perfil) {
+  localStorage.setItem('planova_perfil_renda', perfil);
+  _aplicarPerfilRenda();
+  fecharSplash();
+}
+
+function mostrarEscolhaPerfilRenda() {
+  _authMostrarPainel('perfil-renda-panel');
+}
+
+function _entrarComGoogle() {
+  if (!_perfilRendaDefinido()) {
+    mostrarEscolhaPerfilRenda();
+    return;
+  }
+  fecharSplash();
+}
+
 function toggleSenhaVisivel(inputId, btn) {
   const input = document.getElementById(inputId);
   if (!input) return;
@@ -8662,6 +9230,10 @@ function fazerLogin() {
   const senha = (document.getElementById('login-senha')?.value || '').trim();
   if (!email || !senha) {
     _authErro('login-panel', 'Preencha e-mail e senha para continuar.');
+    return;
+  }
+  if (!_perfilRendaDefinido()) {
+    mostrarEscolhaPerfilRenda();
     return;
   }
   fecharSplash();
@@ -8679,7 +9251,7 @@ function fazerCadastro() {
     _authErro('cadastro-panel', 'A senha deve ter pelo menos 8 caracteres.');
     return;
   }
-  fecharSplash();
+  mostrarEscolhaPerfilRenda();
 }
 
 function enviarRecuperacao() {
@@ -10570,8 +11142,270 @@ function _syncIconesDark(isDark) {
 
 let _anualAno = new Date().getFullYear();
 let _anualDados = { faturado: [], gastos: [], saldo: [], reserva: [] };
+let _anualModoEditar = false;
 
 const MESES_CURTOS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+// Ordem padrão: saldo é o protagonista (posição 0)
+const _ANUAL_ORDEM_KEY = 'planova_anual_ordem';
+const _ANUAL_WIDGETS_DEFAULT = ['saldo', 'faturado', 'gastos', 'reserva'];
+
+function _anualGetOrdem() {
+  try {
+    const raw = localStorage.getItem(_ANUAL_ORDEM_KEY);
+    if (!raw) return [..._ANUAL_WIDGETS_DEFAULT];
+    const parsed = JSON.parse(raw);
+    // Valida que tem os 4 widgets
+    if (Array.isArray(parsed) && parsed.length === 4 &&
+        _ANUAL_WIDGETS_DEFAULT.every(w => parsed.includes(w))) return parsed;
+  } catch(e) {}
+  return [..._ANUAL_WIDGETS_DEFAULT];
+}
+
+function _anualSalvarOrdem(ordem) {
+  localStorage.setItem(_ANUAL_ORDEM_KEY, JSON.stringify(ordem));
+}
+
+// Definições de cada widget
+const _ANUAL_WIDGET_DEF = {
+  saldo: {
+    id: 'widget-saldo',
+    cor: 'azul',
+    iconeCor: 'anual-widget-icon--azul',
+    iconeSize: 26,
+    label: 'Saldo do Período',
+    desc: 'Entrada menos gastos em ',
+    descId: 'anual-saldo-ano-label',
+    totalId: 'anual-saldo-total',
+    sparkId: 'spark-saldo',
+    popup: 'saldo',
+    svgPath: `<line x1="12" y1="3" x2="12" y2="20"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="4" y1="7" x2="20" y2="7"/><path d="M4 7 L1 13 Q4 16.5 7 13 Z"/><path d="M20 7 L17 13 Q20 16.5 23 13 Z"/>`,
+  },
+  faturado: {
+    id: 'widget-faturado',
+    cor: 'verde',
+    iconeCor: 'anual-widget-icon--verde',
+    iconeSize: 22,
+    label: 'Total Faturado',
+    desc: 'Salário bruto em ',
+    descId: 'anual-faturado-ano-label',
+    totalId: 'anual-faturado-total',
+    sparkId: 'spark-faturado',
+    popup: 'faturado',
+    svgPath: `<path d="M20 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><circle cx="17.5" cy="13.5" r="1.5" fill="currentColor" stroke="none"/>`,
+  },
+  gastos: {
+    id: 'widget-gastos',
+    cor: 'vermelho',
+    iconeCor: 'anual-widget-icon--vermelho',
+    iconeSize: 22,
+    label: 'Total Gasto',
+    desc: 'Gastos brutos em ',
+    descId: 'anual-gastos-ano-label',
+    totalId: 'anual-gastos-total',
+    sparkId: 'spark-gastos',
+    popup: 'gastos',
+    svgPath: `<path d="M4 2v20l3-2 2 2 2-2 2 2 2-2 3 2V2l-3 2-2-2-2 2-2-2-2 2-3-2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/>`,
+  },
+  reserva: {
+    id: 'widget-reserva',
+    cor: 'dourado',
+    iconeCor: 'anual-widget-icon--dourado',
+    iconeSize: 22,
+    label: 'Reserva Guardada',
+    desc: 'Depósitos na reserva em ',
+    descId: 'anual-reserva-ano-label',
+    totalId: 'anual-reserva-total',
+    sparkId: 'spark-reserva',
+    popup: 'reserva',
+    svgPath: `<rect x="2" y="3" width="20" height="16" rx="2"/><circle cx="12" cy="11" r="3.5"/><circle cx="12" cy="11" r="1.2" fill="currentColor" stroke="none"/><line x1="7" y1="19" x2="7" y2="21"/><line x1="17" y1="19" x2="17" y2="21"/><line x1="16.5" y1="6.5" x2="19" y2="6.5"/><line x1="16.5" y1="9.5" x2="19" y2="9.5"/>`,
+  },
+};
+
+function _anualBuildGrid() {
+  const grid   = document.getElementById('anual-grid');
+  const ordem  = _anualGetOrdem();
+  const heroi  = ordem[0];
+  const outros = ordem.slice(1);
+
+  grid.innerHTML = '';
+
+  // ── Widget protagonista ──
+  const def = _ANUAL_WIDGET_DEF[heroi];
+  const heroEl = document.createElement('div');
+  heroEl.className = 'anual-widget anual-widget--saldo';
+  heroEl.id = def.id;
+  heroEl.dataset.key = heroi;
+  heroEl.innerHTML = `
+    <div class="anual-widget-top">
+      <div class="anual-widget-icon ${def.iconeCor}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${def.svgPath}</svg>
+      </div>
+      <div class="anual-widget-info">
+        <div class="anual-widget-label">${def.label}</div>
+        <div class="anual-widget-total ${heroi === 'saldo' ? 'azul' : def.cor}" id="${def.totalId}">R$ 0,00</div>
+        <div class="anual-widget-desc">${def.desc || ''}<span id="${def.descId}">${_anualAno}</span></div>
+      </div>
+    </div>
+    <div class="anual-proporcao-wrap" id="anual-proporcao-wrap" style="display:none;">
+      <div class="anual-proporcao-track">
+        <div class="anual-proporcao-gasto" id="anual-proporcao-gasto"></div>
+        <div class="anual-proporcao-saldo" id="anual-proporcao-saldo"></div>
+      </div>
+      <div class="anual-proporcao-legenda">
+        <span class="anual-prop-leg anual-prop-leg--gasto"><span class="anual-prop-dot anual-prop-dot--gasto"></span><span id="anual-prop-pct-gasto">0%</span> gasto</span>
+        <span class="anual-prop-leg anual-prop-leg--saldo"><span class="anual-prop-dot anual-prop-dot--saldo"></span><span id="anual-prop-pct-saldo">0%</span> sobrou</span>
+      </div>
+    </div>
+    <div class="anual-insight-inline" id="anual-insight-row" style="display:none;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="anual-insight-icon" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span id="anual-insight-texto"></span>
+    </div>
+    <div class="anual-sparkline-wrap anual-sparkline-wrap--lg">
+      <div class="anual-sparkline anual-sparkline--lg" id="${def.sparkId}"></div>
+      <div class="anual-spark-meses" id="spark-meses-saldo"></div>
+    </div>
+    <div class="anual-widget-cta">Ver detalhes →</div>
+  `;
+  if (!_anualModoEditar) heroEl.onclick = () => anualAbrirPopup(heroi);
+  grid.appendChild(heroEl);
+
+  // ── Coluna direita com 3 widgets compactos ──
+  const colDir = document.createElement('div');
+  colDir.className = 'anual-col-direita';
+
+  outros.forEach(function(key) {
+    const d = _ANUAL_WIDGET_DEF[key];
+    const el = document.createElement('div');
+    el.className = 'anual-widget anual-widget--sm';
+    el.id = d.id;
+    el.dataset.key = key;
+    el.innerHTML = `
+      <div class="anual-widget-icon ${d.iconeCor}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d.svgPath}</svg>
+      </div>
+      <div class="anual-widget-info">
+        <div class="anual-widget-label">${d.label}</div>
+        <div class="anual-widget-total ${key === 'saldo' ? 'azul' : d.cor}" id="${d.totalId}">R$ 0,00</div>
+        <div class="anual-widget-desc">${key === 'saldo' ? 'Entrada menos gastos em ' : (d.desc || '')} <span id="${d.descId}">${_anualAno}</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-left:auto;">
+        <span class="anual-tendencia-badge" id="tendencia-${key}" style="display:none;"></span>
+        <div class="anual-sparkline-wrap anual-sparkline-wrap--mini">
+          <div class="anual-sparkline anual-sparkline--mini" id="${d.sparkId}"></div>
+        </div>
+      </div>
+    `;
+    if (!_anualModoEditar) el.onclick = () => anualAbrirPopup(key);
+    colDir.appendChild(el);
+  });
+
+  grid.appendChild(colDir);
+
+  if (_anualModoEditar) _anualAtivarDrag();
+}
+
+let _anualOrdemOriginal = null; // guarda a ordem ao entrar no modo editar
+
+function _anualAtualizarBtnEditar() {
+  const btn    = document.getElementById('btn-anual-editar');
+  if (!btn) return;
+  const mudou  = _anualOrdemOriginal &&
+                 JSON.stringify(_anualGetOrdem()) !== JSON.stringify(_anualOrdemOriginal);
+  if (mudou) {
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Salvar';
+  } else {
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Personalizar';
+  }
+}
+
+function anualToggleEditar() {
+  _anualModoEditar = !_anualModoEditar;
+  const btn  = document.getElementById('btn-anual-editar');
+  const grid = document.getElementById('anual-grid');
+  if (_anualModoEditar) {
+    _anualOrdemOriginal = _anualGetOrdem().slice(); // snapshot da ordem atual
+    btn.classList.add('ativo');
+    grid.classList.add('modo-editar');
+    grid.querySelectorAll('.anual-widget').forEach(function(w) {
+      if (!w.querySelector('.anual-drag-hint')) {
+        const h = document.createElement('div');
+        h.className = 'anual-drag-hint';
+        h.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg> mover';
+        w.appendChild(h);
+      }
+      w.onclick = null;
+    });
+    _anualAtivarDrag();
+  } else {
+    _anualOrdemOriginal = null;
+    btn.classList.remove('ativo');
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Personalizar';
+    grid.classList.remove('modo-editar');
+    _anualBuildGrid();
+    anualCarregar();
+  }
+}
+
+function _anualAtivarDrag() {
+  const grid    = document.getElementById('anual-grid');
+  const widgets = grid.querySelectorAll('.anual-widget');
+  let dragKey   = null;
+
+  widgets.forEach(function(w) {
+    w.draggable = true;
+
+    w.addEventListener('dragstart', function(e) {
+      dragKey = w.dataset.key;
+      w.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    w.addEventListener('dragend', function() {
+      w.classList.remove('dragging');
+      grid.querySelectorAll('.anual-widget').forEach(x => x.classList.remove('drag-over'));
+    });
+
+    w.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (w.dataset.key !== dragKey) {
+        grid.querySelectorAll('.anual-widget').forEach(x => x.classList.remove('drag-over'));
+        w.classList.add('drag-over');
+      }
+    });
+
+    w.addEventListener('dragleave', function() {
+      w.classList.remove('drag-over');
+    });
+
+    w.addEventListener('drop', function(e) {
+      e.preventDefault();
+      w.classList.remove('drag-over');
+      if (!dragKey || w.dataset.key === dragKey) return;
+
+      const ordem = _anualGetOrdem();
+      const fromIdx = ordem.indexOf(dragKey);
+      const toIdx   = ordem.indexOf(w.dataset.key);
+      if (fromIdx === -1 || toIdx === -1) return;
+
+      // Troca simples entre as duas posições
+      const tmp = ordem[fromIdx];
+      ordem[fromIdx] = ordem[toIdx];
+      ordem[toIdx] = tmp;
+      _anualSalvarOrdem(ordem);
+
+      // Reconstrói e mantém modo edição
+      _anualBuildGrid();
+      anualCarregar();
+      // Reativa drag após rebuild
+      const grid2 = document.getElementById('anual-grid');
+      grid2.classList.add('modo-editar');
+      _anualAtivarDrag();
+      _anualAtualizarBtnEditar();
+    });
+  });
+}
 
 function anualNavegar(delta) {
   _anualAno += delta;
@@ -10579,9 +11413,15 @@ function anualNavegar(delta) {
 }
 
 function anualCarregar() {
-  document.getElementById('anual-titulo-ano').textContent          = _anualAno;
-  document.getElementById('anual-faturado-ano-label').textContent  = _anualAno;
-  document.getElementById('anual-gastos-ano-label').textContent    = _anualAno;
+  const ordem = _anualGetOrdem();
+  _anualBuildGrid();
+
+  document.getElementById('anual-titulo-ano').textContent = _anualAno;
+  // Atualiza labels de ano nos widgets
+  ['saldo','faturado','gastos','reserva'].forEach(function(key) {
+    const el = document.getElementById(_ANUAL_WIDGET_DEF[key].descId);
+    if (el) el.textContent = _anualAno;
+  });
 
   const faturadoPorMes = [];
   const gastosPorMes   = [];
@@ -10604,7 +11444,7 @@ function anualCarregar() {
         const extDados = JSON.parse(extrasRaw);
         [1, 2].forEach(entrada => {
           const lista   = extDados[String(entrada)] || [];
-          const isSomar = extDados['info' + entrada] !== false;
+          const isSomar = extDados['info' + entrada] === true;
           if (isSomar) lista.forEach(e => { extrasSoma += num(e.valor || ''); });
         });
       } catch(e) {}
@@ -10615,6 +11455,17 @@ function anualCarregar() {
     Object.keys(dados).forEach(k => {
       if (k.endsWith('_val')) totalGastos += num(dados[k] || '');
     });
+
+    // Inclui alocações do Diário (períodos vinculados) nos gastos do mês
+    try {
+      const alocRaw = localStorage.getItem('diario_alocacao_v1');
+      if (alocRaw) {
+        const alocAll = JSON.parse(alocRaw);
+        const alocMes = alocAll[_anualAno + '_' + m] || {};
+        totalGastos += parseFloat(alocMes['1'] || 0) + parseFloat(alocMes['2'] || 0);
+      }
+    } catch(e) {}
+
     gastosPorMes.push(totalGastos);
   }
 
@@ -10622,7 +11473,6 @@ function anualCarregar() {
   _anualDados.gastos   = gastosPorMes;
   _anualDados.saldo    = faturadoPorMes.map((f, i) => f - gastosPorMes[i]);
 
-  // Reserva: lê dep_reserva_ANO_MES para cada mês
   const reservaPorMes = [];
   for (let m = 0; m < 12; m++) {
     const v = parseFloat(localStorage.getItem('dep_reserva_' + _anualAno + '_' + m) || '0');
@@ -10635,15 +11485,116 @@ function anualCarregar() {
   const totalSaldo    = totalFaturado - totalGastos;
   const totalReserva  = reservaPorMes.reduce((a,b) => a+b, 0);
 
+  // Totais
   document.getElementById('anual-faturado-total').textContent  = _anualFmt(totalFaturado);
   document.getElementById('anual-gastos-total').textContent    = _anualFmt(totalGastos);
-  document.getElementById('anual-saldo-ano-label').textContent = _anualAno;
-  document.getElementById('anual-reserva-ano-label').textContent = _anualAno;
   document.getElementById('anual-reserva-total').textContent   = _anualFmt(totalReserva);
 
   const saldoEl = document.getElementById('anual-saldo-total');
-  saldoEl.textContent = _anualFmt(Math.abs(totalSaldo));
-  saldoEl.className = 'anual-widget-total ' + (totalSaldo >= 0 ? 'azul' : 'vermelho-saldo');
+  if (saldoEl) {
+    saldoEl.textContent = _anualFmt(Math.abs(totalSaldo));
+    saldoEl.className   = 'anual-widget-total ' + (totalSaldo >= 0 ? 'azul' : 'vermelho-saldo');
+  }
+
+  // Badges de tendência — compara último mês com dados vs penúltimo mês com dados
+  (function() {
+    // Monta array de meses com dados no ano atual (índice + totais)
+    const mesesComDados = [];
+    for (let m = 0; m < 12; m++) {
+      const fat = faturadoPorMes[m];
+      const gas = gastosPorMes[m];
+      const res = reservaPorMes[m];
+      if (fat > 0 || gas > 0) {
+        mesesComDados.push({ m, faturado: fat, gastos: gas, saldo: fat - gas, reserva: res });
+      }
+    }
+
+    // Precisa de pelo menos 2 meses para comparar
+    if (mesesComDados.length < 2) {
+      ['faturado','gastos','saldo','reserva'].forEach(function(key) {
+        const b = document.getElementById('tendencia-' + key);
+        if (b) b.style.display = 'none';
+      });
+      return;
+    }
+
+    const ultimo    = mesesComDados[mesesComDados.length - 1];
+    const penultimo = mesesComDados[mesesComDados.length - 2];
+
+    const MESES_CURTOS2 = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+    const inverterKey = { faturado: false, gastos: true, saldo: false, reserva: false };
+
+    ['faturado','gastos','saldo','reserva'].forEach(function(key) {
+      const badge = document.getElementById('tendencia-' + key);
+      if (!badge) return;
+
+      const atual = ultimo[key];
+      const ant   = penultimo[key];
+
+      // Saldo pode ser zero ou negativo — tratar separado
+      if (key === 'saldo') {
+        const diff = atual - ant;
+        if (Math.abs(diff) < 0.5) { badge.style.display = 'none'; return; }
+        const subindo  = diff > 0;
+        badge.textContent = (subindo ? '↑' : '↓') + ' ' + _anualFmt(Math.abs(diff)).replace('R$ ','');
+        badge.className   = 'anual-tendencia-badge ' + (subindo ? 'tendencia-pos' : 'tendencia-neg');
+        badge.title = 'vs. ' + MESES_CURTOS2[penultimo.m];
+        badge.style.display = '';
+        return;
+      }
+
+      if (ant <= 0 || atual <= 0) { badge.style.display = 'none'; return; }
+      const diff = ((atual - ant) / ant) * 100;
+      if (Math.abs(diff) < 0.5) { badge.style.display = 'none'; return; }
+      const subindo  = diff > 0;
+      const positivo = inverterKey[key] ? !subindo : subindo;
+      badge.textContent = (subindo ? '↑' : '↓') + ' ' + Math.abs(diff).toFixed(0) + '%';
+      badge.className   = 'anual-tendencia-badge ' + (positivo ? 'tendencia-pos' : 'tendencia-neg');
+      badge.title = 'vs. ' + MESES_CURTOS2[penultimo.m];
+      badge.style.display = '';
+    });
+  })();
+
+  // Sparklines — protagonista usa sparkline grande, os outros mini
+  const heroi = ordem[0];
+  const sparkLg = document.getElementById(_ANUAL_WIDGET_DEF[heroi].sparkId);
+  if (sparkLg) sparkLg.className = 'anual-sparkline anual-sparkline--lg';
+
+  // Renderiza sparklines por widget
+  const dadosPorKey = { faturado: faturadoPorMes, gastos: gastosPorMes, saldo: _anualDados.saldo, reserva: reservaPorMes };
+  const corPorKey   = { faturado: 'verde', gastos: 'vermelho', saldo: null, reserva: 'dourado' };
+
+  ordem.forEach(function(key, idx) {
+    if (idx === 0) {
+      // Protagonista: sparkline grande com meses
+      _anualRenderSparklineSaldo(_ANUAL_WIDGET_DEF[key].sparkId, 'spark-meses-saldo', dadosPorKey[key], corPorKey[key]);
+    } else {
+      // Mini: saldo usa azul-pos (cor fixa, sem lógica pos/neg)
+      const corMini = (key === 'saldo') ? 'azul-pos' : (corPorKey[key] || 'azul-pos');
+      _anualRenderSparklineMini(_ANUAL_WIDGET_DEF[key].sparkId, dadosPorKey[key], corMini);
+    }
+  });
+
+  // Proporção e insight — sempre com dados de saldo
+  _anualRenderProporcao(totalFaturado, totalGastos, totalSaldo);
+  _anualRenderInsight(totalFaturado, totalGastos, totalSaldo, faturadoPorMes, gastosPorMes, reservaPorMes, heroi);
+
+  // Se modo edição estava ativo, reativa drag e hints
+  if (_anualModoEditar) {
+    const grid = document.getElementById('anual-grid');
+    grid.classList.add('modo-editar');
+    grid.querySelectorAll('.anual-widget').forEach(function(w) {
+      if (!w.querySelector('.anual-drag-hint')) {
+        const h = document.createElement('div');
+        h.className = 'anual-drag-hint';
+        h.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg> mover';
+        w.appendChild(h);
+      }
+      w.onclick = null;
+    });
+    _anualAtivarDrag();
+  }
 }
 
 function _anualFmt(v) {
@@ -10772,6 +11723,166 @@ function _anualRenderBarsSaldo(containerId, valores) {
   });
 }
 
+/* ── Sparkline mini — cards compactos (sem labels de mês) ── */
+function _anualRenderSparklineMini(barId, valores, cor) {
+  const barWrap = document.getElementById(barId);
+  if (!barWrap) return;
+  const maxVal   = Math.max(...valores, 1);
+  const mesAtual = new Date().getMonth();
+  const anoReal  = new Date().getFullYear();
+
+  barWrap.innerHTML = '';
+  valores.forEach((val, i) => {
+    const isDestaque = (_anualAno === anoReal && i === mesAtual);
+    const pct = Math.max((val / maxVal) * 100, val > 0 ? 10 : 3);
+    const bar = document.createElement('div');
+    bar.className = 'anual-spark-bar anual-spark-bar--' + (val > 0 ? cor : 'vazio')
+      + (isDestaque && val > 0 ? ' anual-spark-bar--destaque' : '');
+    bar.style.height = pct + '%';
+    barWrap.appendChild(bar);
+  });
+}
+
+/* ── Sparkline grande — card protagonista (com barras e labels de mês) ── */
+function _anualRenderSparklineSaldo(barId, mesId, valores, corOverride) {
+  const barWrap = document.getElementById(barId);
+  const mesWrap = document.getElementById(mesId);
+  if (!barWrap) return;
+  const maxAbs   = Math.max(...valores.map(v => Math.abs(v)), 1);
+  const mesAtual = new Date().getMonth();
+  const anoReal  = new Date().getFullYear();
+  const MESES_MIN = ['J','F','M','A','M','J','J','A','S','O','N','D'];
+
+  barWrap.innerHTML = '';
+  if (mesWrap) mesWrap.innerHTML = '';
+
+  valores.forEach((val, i) => {
+    const isDestaque = (_anualAno === anoReal && i === mesAtual);
+    const pct = Math.max((Math.abs(val) / maxAbs) * 100, Math.abs(val) > 0 ? 8 : 3);
+    let corBase;
+    if (corOverride) {
+      corBase = val === 0 ? 'vazio' : corOverride;
+    } else {
+      const isPos = val >= 0;
+      corBase = val === 0 ? 'vazio' : (isPos ? 'azul-pos' : 'azul-neg');
+    }
+
+    const bar = document.createElement('div');
+    bar.className = 'anual-spark-bar anual-spark-bar--' + corBase
+      + (isDestaque && val !== 0 ? ' anual-spark-bar--destaque' : '');
+    bar.style.height = pct + '%';
+
+    if (isDestaque) {
+      const col = document.createElement('div');
+      col.className = 'anual-spark-col-destaque';
+      const dot = document.createElement('div');
+      dot.className = 'anual-spark-dot-atual';
+      col.appendChild(dot);
+      col.appendChild(bar);
+      barWrap.appendChild(col);
+    } else {
+      barWrap.appendChild(bar);
+    }
+
+    if (mesWrap) {
+      const lbl = document.createElement('div');
+      lbl.className = 'anual-spark-mes' + (isDestaque ? ' anual-spark-mes--destaque' : '');
+      lbl.textContent = MESES_MIN[i];
+      mesWrap.appendChild(lbl);
+    }
+  });
+}
+
+/* ── Barra de proporção faturado × gasto (card Saldo) ── */
+function _anualRenderProporcao(totalFaturado, totalGastos, totalSaldo) {
+  const wrap = document.getElementById('anual-proporcao-wrap');
+  const gastoEl  = document.getElementById('anual-proporcao-gasto');
+  const saldoEl2 = document.getElementById('anual-proporcao-saldo');
+  const pctGastoEl  = document.getElementById('anual-prop-pct-gasto');
+  const pctSaldoEl  = document.getElementById('anual-prop-pct-saldo');
+  if (!wrap || !gastoEl) return;
+
+  if (totalFaturado <= 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+
+  const pctGasto = Math.min((totalGastos / totalFaturado) * 100, 100);
+  const pctSaldo = Math.max(100 - pctGasto, 0);
+
+  gastoEl.style.width  = pctGasto.toFixed(1) + '%';
+  saldoEl2.style.width = pctSaldo.toFixed(1) + '%';
+  pctGastoEl.textContent  = pctGasto.toFixed(0) + '%';
+  pctSaldoEl.textContent  = pctSaldo.toFixed(0) + '%';
+}
+
+/* ── Linha de insight dinâmica ── */
+function _anualRenderInsight(totalFaturado, totalGastos, totalSaldo, faturadoPorMes, gastosPorMes, reservaPorMes, heroi) {
+  const row     = document.getElementById('anual-insight-row');
+  const textoEl = document.getElementById('anual-insight-texto');
+  if (!row || !textoEl) return;
+
+  const MESES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const mesesComDado = faturadoPorMes.filter(v => v > 0).length;
+
+  if (mesesComDado === 0 && heroi !== 'reserva') { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+
+  let insight = '';
+
+  if (heroi === 'saldo') {
+    const pctGasto = (totalGastos / totalFaturado) * 100;
+    let melhorMes = -1, melhorSaldo = -Infinity;
+    for (let i = 0; i < 12; i++) {
+      if (faturadoPorMes[i] > 0) {
+        const s = faturadoPorMes[i] - gastosPorMes[i];
+        if (s > melhorSaldo) { melhorSaldo = s; melhorMes = i; }
+      }
+    }
+    if (pctGasto > 100) {
+      insight = `Você gastou mais do que faturou em ${_anualAno}. O saldo ficou negativo em ${_anualFmt(Math.abs(totalSaldo))}.`;
+    } else if (melhorMes >= 0) {
+      const pctFmt = pctGasto.toFixed(1).replace('.', ',');
+      insight = `Você comprometeu <strong>${pctFmt}%</strong> do que faturou em ${_anualAno}. Melhor mês: <strong>${MESES_NOMES[melhorMes]}</strong>, com ${_anualFmt(melhorSaldo)} de sobra.`;
+    }
+
+  } else if (heroi === 'faturado') {
+    const media = mesesComDado > 0 ? totalFaturado / mesesComDado : 0;
+    let maiorMes = -1, maiorVal = -Infinity;
+    for (let i = 0; i < 12; i++) {
+      if (faturadoPorMes[i] > maiorVal) { maiorVal = faturadoPorMes[i]; maiorMes = i; }
+    }
+    if (maiorMes >= 0 && maiorVal > 0) {
+      insight = `Média mensal de <strong>${_anualFmt(media)}</strong>. Mês de maior entrada: <strong>${MESES_NOMES[maiorMes]}</strong>, com ${_anualFmt(maiorVal)}.`;
+    }
+
+  } else if (heroi === 'gastos') {
+    const mesesComGasto = gastosPorMes.filter(v => v > 0).length;
+    const media = mesesComGasto > 0 ? totalGastos / mesesComGasto : 0;
+    let maiorMes = -1, maiorVal = -Infinity;
+    for (let i = 0; i < 12; i++) {
+      if (gastosPorMes[i] > maiorVal) { maiorVal = gastosPorMes[i]; maiorMes = i; }
+    }
+    if (maiorMes >= 0 && maiorVal > 0) {
+      insight = `Média mensal de <strong>${_anualFmt(media)}</strong> em gastos. Mês mais pesado: <strong>${MESES_NOMES[maiorMes]}</strong>, com ${_anualFmt(maiorVal)}.`;
+    } else {
+      row.style.display = 'none'; return;
+    }
+
+  } else if (heroi === 'reserva') {
+    const totalReserva = (reservaPorMes || []).reduce((a, b) => a + b, 0);
+    const mesesComDeposito = (reservaPorMes || []).filter(v => v > 0).length;
+    if (totalReserva <= 0) {
+      insight = `Nenhum depósito na reserva registrado em ${_anualAno}.`;
+    } else {
+      const pctReserva = totalFaturado > 0 ? ((totalReserva / totalFaturado) * 100).toFixed(1).replace('.', ',') : null;
+      const parte1 = pctReserva ? `Você guardou <strong>${pctReserva}%</strong> do que faturou.` : `Total guardado em ${_anualAno}:`;
+      const mesesLabel = mesesComDeposito === 1 ? '1 mês com depósito' : `${mesesComDeposito} meses com depósito`;
+      insight = `${parte1} ${mesesLabel}, somando <strong>${_anualFmt(totalReserva)}</strong>.`;
+    }
+  }
+
+  textoEl.innerHTML = insight;
+}
+
 function anualFecharPopup() {
   const overlay = document.getElementById('anual-popup-overlay');
   const popup   = document.getElementById('anual-popup');
@@ -10789,3 +11900,172 @@ function anualToggleWidget(id) {
   if (!widget) return;
   widget.classList.toggle('aberto');
 }
+/* ══════════════════════════════════════════════════════════════════════
+ *  ATALHOS DE TECLADO
+ *  ← / →  : navegar entre meses (só na página Mensal)
+ *  Esc    : fechar o popup mais recente aberto
+ *  Ctrl+Z : desfazer última edição de campo
+ *  Ctrl+Y : refazer (após Ctrl+Z)
+ * ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Undo / Redo ─────────────────────────────────────────────────────
+ *  Pilha de snapshots do estado completo do mês.
+ *  Cada entrada é { chave, dados } — mesmo formato do localStorage.
+ *  Snapshot é tirado ANTES de cada alteração pelo usuário.
+ * ─────────────────────────────────────────────────────────────────── */
+const _undoStack = [];   // pilha de estados anteriores
+const _redoStack = [];   // pilha de estados "futuros" (após undo)
+const _UNDO_MAX  = 30;   // limite de profundidade
+
+function _undoSnapshot() {
+  if (mesFechado(anoAtual, indice)) return;
+  const chave = 'planejamento_' + anoAtual + '_' + indice;
+  const raw   = localStorage.getItem(chave);
+  const snap  = { chave, dados: raw ? JSON.parse(raw) : {} };
+  _undoStack.push(snap);
+  if (_undoStack.length > _UNDO_MAX) _undoStack.shift();
+  _redoStack.length = 0; // qualquer nova edição limpa o redo
+}
+
+function _undoAplicar(snap) {
+  if (!snap) return;
+  localStorage.setItem(snap.chave, JSON.stringify(snap.dados));
+  carregarMes();
+  recalc();
+}
+
+function _undo() {
+  if (mesFechado(anoAtual, indice)) return;
+  if (!_undoStack.length) return;
+  // Salva estado atual no redo antes de desfazer
+  const chave   = 'planejamento_' + anoAtual + '_' + indice;
+  const raw     = localStorage.getItem(chave);
+  _redoStack.push({ chave, dados: raw ? JSON.parse(raw) : {} });
+  const snap = _undoStack.pop();
+  _undoAplicar(snap);
+  toastLimite('↩ Desfeito');
+}
+
+function _redo() {
+  if (mesFechado(anoAtual, indice)) return;
+  if (!_redoStack.length) return;
+  const chave = 'planejamento_' + anoAtual + '_' + indice;
+  const raw   = localStorage.getItem(chave);
+  _undoStack.push({ chave, dados: raw ? JSON.parse(raw) : {} });
+  const snap = _redoStack.pop();
+  _undoAplicar(snap);
+  toastLimite('↪ Refeito');
+}
+
+/* ── Captura snapshot antes de cada edição nos campos ──────────────── */
+document.addEventListener('focus', function(e) {
+  const el = e.target;
+  if (!el) return;
+  if (el.classList.contains('val-input') ||
+      el.classList.contains('cat-input')  ||
+      (el.tagName === 'SELECT' && el.closest('.bloco-wrap')) ||
+      el.id === 'sal1' || el.id === 'sal2') {
+    _undoSnapshot();
+  }
+}, true);
+
+/* ── Lista de todos os overlays/popups para o Esc ─────────────────── */
+const _ESC_POPUPS = [
+  // overlay id            , função fechar
+  ['anual-popup-overlay'           , () => anualFecharPopup()           ],
+  ['popup-resumo-mes-overlay'      , () => fecharPopupResumoMes()       ],
+  ['popup-fechar-mes-overlay'      , () => fecharPopupFecharMes()       ],
+  ['popup-reabrir-mes-overlay'     , () => fecharPopupReabrirMes()      ],
+  ['popup-movimento-overlay'       , () => fecharPopupMovimento()       ],
+  ['popup-meta-overlay'            , () => fecharPopupMeta()            ],
+  ['popup-cobrir-overlay'          , () => fecharPopupCobrir()          ],
+  ['popup-subcategoria-overlay'    , () => fecharPopupSubcategoria()    ],
+  ['popup-replicar-overlay'        , () => fecharPopupReplicar()        ],
+  ['popup-conflito-overlay'        , () => fecharPopupConflito()        ],
+  ['popup-apagar-parcelas-overlay' , () => fecharPopupApagarParcelas()  ],
+  ['popup-replicar-mes-overlay'    , () => fecharPopupReplicarMes()     ],
+  ['popup-replicar-sal-overlay'    , () => fecharPopupReplicarSal()     ],
+  ['popup-diario-overlay'          , () => fecharPopupDiario()          ],
+  ['popup-diario-excluir-overlay'  , () => fecharPopupDiarioExcluir()   ],
+  ['popup-categorias-overlay'      , () => fecharPopupCategorias()      ],
+  ['popup-config-overlay'          , () => fecharConfig()               ],
+  ['popup-alterar-salario-overlay' , () => fecharPopupAlterarSalario()  ],
+  ['popup-simulador-overlay'       , () => fecharSimuladorAnual()       ],
+  ['popup-importar-overlay'        , () => _fecharPopupImportar()       ],
+  ['popup-excluir-meta-overlay'    , () => fecharPopupConfirmarExcluirMeta() ],
+];
+
+function _fecharPopupTopoEsc() {
+  // Fecha o popup visível de maior z-index (último da lista que estiver visível)
+  for (let i = _ESC_POPUPS.length - 1; i >= 0; i--) {
+    const [id, fn] = _ESC_POPUPS[i];
+    const el = document.getElementById(id);
+    if (el && (el.style.display === 'block' || el.classList.contains('visivel'))) {
+      fn();
+      return true;
+    }
+  }
+  // Tour aberto?
+  const tourOverlay = document.getElementById('tour-overlay');
+  if (tourOverlay && tourOverlay.style.display !== 'none') {
+    tourPular(); return true;
+  }
+  // Menu de dados aberto?
+  const dadosMenu = document.getElementById('dados-menu');
+  if (dadosMenu && dadosMenu.classList.contains('visivel')) {
+    fecharDadosMenu(); return true;
+  }
+  return false;
+}
+
+/* ── Listener global de teclado ────────────────────────────────────── */
+document.addEventListener('keydown', function(e) {
+  const tag     = document.activeElement ? document.activeElement.tagName : '';
+  const emInput = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
+  const ctrl    = e.ctrlKey || e.metaKey;
+
+  // ── Ctrl+Z / Ctrl+Y ─────────────────────────────────────────────
+  if (ctrl && (e.key === 'z' || e.key === 'y' || e.key === 'Y')) {
+    const ativo = document.activeElement;
+    const emCampoPlano = ativo && (
+      ativo.classList.contains('val-input') ||
+      ativo.classList.contains('cat-input') ||
+      ativo.id === 'sal1' || ativo.id === 'sal2' ||
+      (ativo.tagName === 'SELECT' && ativo.closest('.bloco-wrap'))
+    );
+    // Se estiver em campo do planejamento, usa undo/redo do sistema
+    if (emCampoPlano || (!emInput && e.key === 'z')) {
+      e.preventDefault();
+      if (e.key === 'z') _undo(); else _redo();
+    }
+    // Caso contrário, deixa o undo nativo do browser funcionar
+    return;
+  }
+
+  // ── Esc ─────────────────────────────────────────────────────────
+  if (e.key === 'Escape') {
+    _fecharPopupTopoEsc();
+    return;
+  }
+
+  // ── ← / → : navegar meses (só Mensal, sem popup aberto, sem input focado) ──
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    if (emInput) return;
+    if (ctrl)    return;
+    // Só na página mensal
+    const naDiario = document.getElementById('view-diario') &&
+                     document.getElementById('view-diario').style.display !== 'none';
+    const naAnual  = document.getElementById('view-anual') &&
+                     document.getElementById('view-anual').style.display !== 'none';
+    if (naDiario || naAnual) return;
+    // Não age se houver qualquer overlay/popup visível
+    const algumPopup = _ESC_POPUPS.some(function([id]) {
+      const el = document.getElementById(id);
+      if (!el) return false;
+      return el.style.display === 'block' || el.classList.contains('visivel');
+    });
+    if (algumPopup) return;
+    e.preventDefault();
+    changeMonth(e.key === 'ArrowLeft' ? -1 : 1);
+  }
+});

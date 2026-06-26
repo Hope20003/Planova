@@ -158,7 +158,7 @@
         </div>
 
         <!-- Google -->
-        <button class="auth-btn-social" onclick="fecharSplash()">
+        <button class="auth-btn-social" onclick="_entrarComGoogle()">
           <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
           <span>Continuar com Google</span>
         </button>
@@ -204,7 +204,7 @@
           <p class="auth-subtitulo">Grátis para sempre. Sem cartão.</p>
         </div>
 
-        <button class="auth-btn-social" onclick="fecharSplash()">
+        <button class="auth-btn-social" onclick="_entrarComGoogle()">
           <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
           <span>Cadastrar com Google</span>
         </button>
@@ -271,6 +271,40 @@
         </button>
 
         <p class="auth-footer-text"><button class="auth-link" onclick="mostrarLogin()">← Voltar ao login</button></p>
+      </div>
+
+      <!-- PAINEL ESCOLHA DE PERFIL DE RENDA (pós-cadastro / 1º acesso) -->
+      <div id="perfil-renda-panel" class="auth-panel" style="display:none;">
+        <div class="auth-header">
+          <h2 class="auth-titulo">Como você recebe seu salário?</h2>
+          <p class="auth-subtitulo">Cada forma de recebimento tem um layout específico.</p>
+        </div>
+
+        <div class="perfil-renda-opcoes">
+          <button class="perfil-renda-card" onclick="_perfilRendaSelecionar('duas')">
+            <div class="perfil-renda-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="9" height="16" rx="1.5"/><rect x="13" y="4" width="9" height="16" rx="1.5"/></svg>
+            </div>
+            <div class="perfil-renda-text">
+              <strong>Duas vezes no mês</strong>
+              <span>Ideal para quem recebe adiantamento do salário + restante no final do mês ou para casais.</span>
+            </div>
+            <svg class="perfil-renda-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+
+          <button class="perfil-renda-card" onclick="_perfilRendaSelecionar('unica')">
+            <div class="perfil-renda-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="1.5"/></svg>
+            </div>
+            <div class="perfil-renda-text">
+              <strong>Uma vez no mês</strong>
+              <span>Um salário ou um único rendimento por mês.</span>
+            </div>
+            <svg class="perfil-renda-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+
+        <p class="auth-footer-text" style="margin-top:18px;">Essa escolha não pode ser alterada depois!</p>
       </div>
 
     </div><!-- fim splash-right -->
@@ -389,6 +423,7 @@
     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
     <span>Somente leitura</span>
     <button onclick="abrirPopupReabrirMes()" class="banner-fechado-btn">Reabrir</button>
+    <button onclick="_abrirPopupResumoMes(_coletarDadosResumoMes(anoAtual, indice))" class="banner-fechado-btn">Resumo</button>
   </div>
 </div>
 
@@ -408,8 +443,14 @@
         <div class="sal-input-wrap" id="sal1-wrap">
           <input class="salario-input" id="sal1" type="text" placeholder="R$ 0,00" autocomplete="off" oninput="fmtInput(this)" onblur="fmt(this)" >
           <button id="sal1-enter" class="btn-confirmar-sal" onclick="confirmarSalario()">↵</button>
-          <button class="btn-limpar-linha" onclick="limparEntradaSal(1)">×<span class="limpar-tooltip">Limpar salário</span></button>
-          <button class="btn-extras-sal" onclick="toggleExtrasSal(1)" id="btn-extras-sal1">+<span class="replicar-tooltip">Entradas extras</span></button>
+          <div class="sal-menu-wrap" id="sal-menu-wrap-1">
+            <button class="btn-sal-menu" onclick="toggleSalMenu(1)">⋮</button>
+            <div class="sal-menu-dropdown" id="sal-menu-1">
+              <button onclick="toggleExtrasSal(1)" id="btn-extras-sal1"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Renda extra</button>
+              <button onclick="abrirPopupReplicarSal(1);toggleSalMenu(1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.57-8.92"/></svg>Replicar salário</button>
+              <button class="sal-menu-danger" onclick="limparEntradaSal(1);toggleSalMenu(1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>Limpar salário</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="secao-e-subtotal">
@@ -529,8 +570,14 @@
         <div class="sal-input-wrap" id="sal2-wrap">
           <input class="salario-input" id="sal2" type="text" placeholder="R$ 0,00" autocomplete="off" oninput="fmtInput(this)" onblur="fmt(this)" >
           <button id="sal2-enter" class="btn-confirmar-sal" onclick="confirmarSalario()">↵</button>
-          <button class="btn-limpar-linha" onclick="limparEntradaSal(2)">×<span class="limpar-tooltip">Limpar salário</span></button>
-          <button class="btn-extras-sal" onclick="toggleExtrasSal(2)" id="btn-extras-sal2">+<span class="replicar-tooltip">Entradas extras</span></button>
+          <div class="sal-menu-wrap" id="sal-menu-wrap-2">
+            <button class="btn-sal-menu" onclick="toggleSalMenu(2)">⋮</button>
+            <div class="sal-menu-dropdown" id="sal-menu-2">
+              <button onclick="toggleExtrasSal(2)" id="btn-extras-sal2"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Renda extra</button>
+              <button onclick="abrirPopupReplicarSal(2);toggleSalMenu(2)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.57-8.92"/></svg>Replicar salário</button>
+              <button class="sal-menu-danger" onclick="limparEntradaSal(2);toggleSalMenu(2)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>Limpar salário</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="secao-e-subtotal">
@@ -741,6 +788,16 @@
             <div class="reserva-prog-track">
               <div class="reserva-prog-fill" id="res-prog-fill"></div>
             </div>
+            <!-- Anel de progresso — alternativa à barra linear, usado só no
+                 modo 1 entrada (escondido por padrão via inline style;
+                 ".meta-ring-wrap" no CSS do perfil-unico vira display:flex).
+                 Atualizado junto com a barra dentro de _renderizarMetaComSaldo() em script.js. -->
+            <div class="meta-ring-wrap" id="meta-ring-wrap" style="display:none;">
+              <svg width="48" height="48" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="19" fill="none" stroke="#e4ecfa" stroke-width="5"/>
+                <circle cx="24" cy="24" r="19" fill="none" stroke="#3a6edc" stroke-width="5" stroke-linecap="round" transform="rotate(-90 24 24)" id="meta-ring-progress"/>
+              </svg>
+            </div>
             <div class="reserva-prog-valores" style="margin-top:5px;">
               <div style="display:flex;align-items:center;gap:4px;">
                 <span class="reserva-prog-atual" id="res-prog-atual">R$ 0,00</span>
@@ -805,6 +862,10 @@
   </div>
 
 <div class="separador separador-direita" style="margin-left: 50px; margin-right: 16px;"></div>
+
+<!-- Container do perfil único: recebe via JS (appendChild) os cards de
+     previsão/reserva/metas, reposicionando-os como 2ª linha do grid. -->
+<div id="pu-grid-extra"></div>
 
 </div>
 
@@ -998,6 +1059,32 @@
 </div>
 
 <!-- ── POPUP REPLICAR MÊS ── -->
+<div id="popup-replicar-sal-overlay"></div>
+<div id="popup-replicar-sal" role="dialog" aria-modal="true">
+  <button onclick="fecharPopupReplicarSal()" style="position:absolute;top:16px;right:16px;background:none;border:none;cursor:pointer;color:#b0bbdb;font-size:20px;line-height:1;padding:0;" onmouseover="this.style.color='#3a6edc'" onmouseout="this.style.color='#b0bbdb'">✕</button>
+  <div class="popup-icone replicar-mes-icone" style="font-size:36px;margin-bottom:8px;"><svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="#3a6edc" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+  <div class="replicar-titulo">Replicar Salário</div>
+  <div class="replicar-subtitulo" id="popup-replicar-sal-subtitulo">O salário e entradas extras serão copiados para os próximos meses</div>
+
+  <div class="replicar-label" style="text-align:center;margin-bottom:10px;">Replicar por quantos meses?</div>
+  <div class="parcelas-grid" id="parcelas-sal-grid"></div>
+
+  <div class="parcela-custom-wrap">
+    <span class="parcela-custom-label">Digite:</span>
+    <div class="parcela-stepper">
+      <button class="parcela-stepper-btn" onclick="stepParcela('parcela-sal-custom-input',-1)">−</button>
+      <input class="parcela-custom-input" id="parcela-sal-custom-input" type="number" min="1" max="120" autocomplete="off">
+      <button class="parcela-stepper-btn" onclick="stepParcela('parcela-sal-custom-input',1)">+</button>
+    </div>
+    <span class="parcela-custom-label">meses</span>
+  </div>
+
+  <div class="replicar-btns">
+    <div id="popup-replicar-sal-aviso" style="display:none;color:#c0392b;font-size:11.5px;font-weight:600;text-align:center;margin-bottom:10px;line-height:1.5;"></div>
+    <button id="btn-replicar-sal-confirmar" class="btn-replicar-confirmar" style="width:100%;" onclick="confirmarReplicarSal()">Replicar</button>
+  </div>
+</div>
+
 <div id="popup-replicar-mes-overlay"></div>
 <div id="popup-replicar-mes" role="dialog" aria-modal="true">
   <button onclick="fecharPopupReplicarMes()" style="position:absolute;top:16px;right:16px;background:none;border:none;cursor:pointer;color:#b0bbdb;font-size:20px;line-height:1;padding:0;" onmouseover="this.style.color='#3a6edc'" onmouseout="this.style.color='#b0bbdb'">✕</button>
@@ -1291,6 +1378,75 @@
   </div>
 </div>
 
+<!-- ── POPUP RESUMO MENSAL (pós-fechamento) ── -->
+<div id="popup-resumo-mes-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,21,64,0.45);z-index:10002;backdrop-filter:blur(4px);"></div>
+<div id="popup-resumo-mes" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.94);z-index:10003;background:#fff;border-radius:20px;box-shadow:0 16px 56px rgba(28,63,145,0.22);width:400px;max-width:95vw;opacity:0;transition:opacity 0.25s ease,transform 0.25s cubic-bezier(0.34,1.15,0.64,1);pointer-events:none;overflow:hidden;">
+  <!-- Header -->
+  <div id="popup-resumo-header" style="padding:24px 26px 20px;border-bottom:1.5px solid #eef2fb;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,rgba(28,63,145,0.12),rgba(58,110,220,0.18));display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1c3f91" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#8a9cc8;letter-spacing:.06em;text-transform:uppercase;">Fechamento realizado</div>
+          <div style="font-size:15px;font-weight:700;color:#0f1f5c;margin-top:1px;" id="resumo-titulo-mes">Janeiro 2026</div>
+        </div>
+      </div>
+      <button onclick="fecharPopupResumoMes()" style="background:none;border:none;cursor:pointer;color:#b0bcd8;padding:6px;border-radius:8px;display:flex;align-items:center;transition:color 0.15s,background 0.15s;" onmouseover="this.style.background='rgba(58,110,220,0.07)';this.style.color='#1c3f91'" onmouseout="this.style.background='none';this.style.color='#b0bcd8'">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+  <!-- Corpo -->
+  <div style="padding:20px 26px 24px;">
+    <!-- Linha de métricas principais -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div class="resumo-metrica">
+        <div class="resumo-metrica-label">Entrou</div>
+        <div class="resumo-metrica-val verde" id="resumo-faturado">R$ 0,00</div>
+      </div>
+      <div class="resumo-metrica">
+        <div class="resumo-metrica-label">Saiu</div>
+        <div class="resumo-metrica-val vermelho" id="resumo-gastos">R$ 0,00</div>
+      </div>
+      <div class="resumo-metrica">
+        <div class="resumo-metrica-label">Sobrou</div>
+        <div class="resumo-metrica-val" id="resumo-saldo">R$ 0,00</div>
+      </div>
+    </div>
+    <!-- Barra de proporção -->
+    <div style="height:8px;border-radius:6px;background:#eef2fb;overflow:hidden;margin-bottom:8px;">
+      <div id="resumo-barra-gasto" style="height:100%;border-radius:6px;background:linear-gradient(90deg,rgba(58,110,220,0.55),rgba(192,57,43,0.65));transition:width 0.6s cubic-bezier(0.34,1.1,0.64,1);width:0%;"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:18px;">
+      <span style="font-size:11px;color:#8a9cc8;font-weight:600;" id="resumo-pct-gasto">0% comprometido</span>
+      <span style="font-size:11px;font-weight:700;" id="resumo-pct-sobrou">0% livre</span>
+    </div>
+    <!-- Comparação com mês anterior -->
+    <div id="resumo-comparacao" style="display:none;background:#f5f8fe;border-radius:12px;padding:12px 14px;margin-bottom:16px;border:1.5px solid #e4eaf8;">
+      <div style="font-size:11px;font-weight:700;color:#8a9cc8;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;">vs. mês anterior</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:12px;color:#5a6a8a;">Gastos</span>
+          <span style="font-size:12px;font-weight:700;" id="resumo-comp-gastos">—</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:12px;color:#5a6a8a;">Saldo</span>
+          <span style="font-size:12px;font-weight:700;" id="resumo-comp-saldo">—</span>
+        </div>
+      </div>
+    </div>
+    <!-- Reserva/meta se houver depósito -->
+    <div id="resumo-reserva-row" style="display:none;background:#f5f8fe;border-radius:12px;padding:12px 14px;margin-bottom:16px;border:1.5px solid #e4eaf8;">
+      <div style="font-size:11px;font-weight:700;color:#8a9cc8;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;">Guardado este mês</div>
+      <div id="resumo-reserva-conteudo" style="font-size:12px;color:#5a6a8a;line-height:1.7;"></div>
+    </div>
+    <!-- Botão fechar -->
+    <button onclick="fecharPopupResumoMes()" style="width:100%;background:none;border:1.5px solid rgba(58,110,220,0.22);border-radius:12px;padding:10px 0;font-size:13px;font-weight:600;font-family:inherit;color:#7a8cc0;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='rgba(58,110,220,0.45)';this.style.color='#3a6edc'" onmouseout="this.style.borderColor='rgba(58,110,220,0.22)';this.style.color='#7a8cc0'">Fechar</button>
+  </div>
+</div>
+
 <!-- ── POPUP REABRIR MÊS ── -->
 <div id="popup-reabrir-mes-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,21,64,0.38);z-index:10000;backdrop-filter:blur(3px);"></div>
 <div id="popup-reabrir-mes" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.94);z-index:10001;background:#fff;border-radius:18px;box-shadow:0 12px 48px rgba(28,63,145,0.22);padding:28px 26px 24px;width:340px;max-width:94vw;opacity:0;transition:opacity 0.22s ease,transform 0.22s cubic-bezier(0.34,1.15,0.64,1);pointer-events:none;">
@@ -1478,38 +1634,25 @@
   <div id="popup-diario-titulo" style="font-family:'Outfit','Century Gothic',sans-serif;font-size:15px;font-weight:700;color:#0f1f5c;text-align:center;margin-bottom:4px;letter-spacing:0.1px;">Cadastrar período</div>
   <div style="font-size:11px;color:#8a9cc8;text-align:center;margin-bottom:20px;">De quando até quando vai usar esse dinheiro?</div>
 
-  <!-- Período: de → até em linha única -->
+  <!-- Período: de → até com date pickers -->
   <div class="popup-meta-group">
     <label class="popup-meta-label">Período</label>
-    <div style="display:flex;align-items:center;gap:6px;">
+    <div style="display:flex;align-items:center;gap:8px;min-width:0;overflow:visible;">
 
-      <!-- Dia início -->
-      <div class="popup-meta-dropdown" id="popup-diario-dia-ini-wrap" style="flex:0.7;position:relative;">
-        <input class="popup-diario-input-drop" type="text" id="popup-diario-dia-ini-display" placeholder="Dia" maxlength="2" autocomplete="off" style="font-size:12px;">
-        <div class="popup-meta-drop-list" id="popup-diario-dia-ini-list" style="max-height:160px;overflow-y:auto;"></div>
-        <input type="hidden" id="popup-diario-dia-ini" value="">
-      </div>
-      <!-- Mês início -->
-      <div class="popup-meta-dropdown" id="popup-diario-mes-ini-wrap" style="flex:1;position:relative;">
-        <input class="popup-diario-input-drop" type="text" id="popup-diario-mes-ini-display" placeholder="Mês" autocomplete="off" style="font-size:12px;">
-        <div class="popup-meta-drop-list" id="popup-diario-mes-ini-list" style="max-height:160px;overflow-y:auto;"></div>
-        <input type="hidden" id="popup-diario-mes-ini" value="">
+      <!-- Início -->
+      <div class="diario-date-wrap" id="diario-date-wrap-ini" onclick="_diarioAbrirPicker('ini')">
+        <span class="diario-date-display" id="popup-diario-date-ini-display">Selecionar</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       </div>
 
       <span style="color:#aab8d8;font-size:13px;font-weight:600;flex-shrink:0;">até</span>
 
-      <!-- Dia fim -->
-      <div class="popup-meta-dropdown" id="popup-diario-dia-fim-wrap" style="flex:0.7;position:relative;">
-        <input class="popup-diario-input-drop" type="text" id="popup-diario-dia-fim-display" placeholder="Dia" maxlength="2" autocomplete="off" style="font-size:12px;">
-        <div class="popup-meta-drop-list" id="popup-diario-dia-fim-list" style="max-height:160px;overflow-y:auto;"></div>
-        <input type="hidden" id="popup-diario-dia-fim" value="">
+      <!-- Fim -->
+      <div class="diario-date-wrap" id="diario-date-wrap-fim" onclick="_diarioAbrirPicker('fim')">
+        <span class="diario-date-display" id="popup-diario-date-fim-display">Selecionar</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       </div>
-      <!-- Mês fim -->
-      <div class="popup-meta-dropdown" id="popup-diario-mes-fim-wrap" style="flex:1;position:relative;">
-        <input class="popup-diario-input-drop" type="text" id="popup-diario-mes-fim-display" placeholder="Mês" autocomplete="off" style="font-size:12px;">
-        <div class="popup-meta-drop-list" id="popup-diario-mes-fim-list" style="max-height:160px;overflow-y:auto;"></div>
-        <input type="hidden" id="popup-diario-mes-fim" value="">
-      </div>
+
     </div>
   </div>
 
@@ -1553,83 +1696,21 @@
   <div class="anual-container">
     <div class="anual-header-row">
       <h2 class="anual-titulo">Visão Geral</h2>
-      <div class="anual-ano-nav">
-        <button class="btn-mes" onclick="anualNavegar(-1)">&#10094;</button>
-        <span id="anual-titulo-ano" class="anual-ano-label">2026</span>
-        <button class="btn-mes" onclick="anualNavegar(1)">&#10095;</button>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button id="btn-anual-editar" class="btn-anual-editar" onclick="anualToggleEditar()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Personalizar
+        </button>
+        <div class="anual-ano-nav">
+          <button class="btn-mes" onclick="anualNavegar(-1)">&#10094;</button>
+          <span id="anual-titulo-ano" class="anual-ano-label">2026</span>
+          <button class="btn-mes" onclick="anualNavegar(1)">&#10095;</button>
+        </div>
       </div>
     </div>
 
-    <div class="anual-grid">
+    <div id="anual-grid" class="anual-grid"></div>
 
-      <!-- Card Faturado -->
-      <div class="anual-widget" id="widget-faturado" onclick="anualAbrirPopup('faturado')">
-        <div class="anual-widget-icon anual-widget-icon--verde">
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
-            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
-            <circle cx="17.5" cy="13.5" r="1.5" fill="currentColor" stroke="none"/>
-          </svg>
-        </div>
-        <div class="anual-widget-label">Total Faturado</div>
-        <div class="anual-widget-total verde" id="anual-faturado-total">R$ 0,00</div>
-        <div class="anual-widget-desc">Salário bruto em <span id="anual-faturado-ano-label">2026</span></div>
-        <div class="anual-widget-cta">Ver detalhes →</div>
-      </div>
-
-      <!-- Card Gastos -->
-      <div class="anual-widget" id="widget-gastos" onclick="anualAbrirPopup('gastos')">
-        <div class="anual-widget-icon anual-widget-icon--vermelho">
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 2v20l3-2 2 2 2-2 2 2 2-2 3 2V2l-3 2-2-2-2 2-2-2-2 2-3-2z"/>
-            <line x1="8" y1="9" x2="16" y2="9"/>
-            <line x1="8" y1="13" x2="16" y2="13"/>
-            <line x1="8" y1="17" x2="12" y2="17"/>
-          </svg>
-        </div>
-        <div class="anual-widget-label">Total Gasto</div>
-        <div class="anual-widget-total vermelho" id="anual-gastos-total">R$ 0,00</div>
-        <div class="anual-widget-desc">Gastos brutos em <span id="anual-gastos-ano-label">2026</span></div>
-        <div class="anual-widget-cta">Ver detalhes →</div>
-      </div>
-
-      <!-- Card Saldo -->
-      <div class="anual-widget" id="widget-saldo" onclick="anualAbrirPopup('saldo')">
-        <div class="anual-widget-icon anual-widget-icon--azul">
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="3" x2="12" y2="20"/>
-            <line x1="8" y1="20" x2="16" y2="20"/>
-            <line x1="4" y1="7" x2="20" y2="7"/>
-            <path d="M4 7 L1 13 Q4 16.5 7 13 Z"/>
-            <path d="M20 7 L17 13 Q20 16.5 23 13 Z"/>
-          </svg>
-        </div>
-        <div class="anual-widget-label">Saldo do Período</div>
-        <div class="anual-widget-total azul" id="anual-saldo-total">R$ 0,00</div>
-        <div class="anual-widget-desc">Entrada menos gastos em <span id="anual-saldo-ano-label">2026</span></div>
-        <div class="anual-widget-cta">Ver detalhes →</div>
-      </div>
-
-      <!-- Card Reserva -->
-      <div class="anual-widget" id="widget-reserva" onclick="anualAbrirPopup('reserva')">
-        <div class="anual-widget-icon anual-widget-icon--dourado">
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="3" width="20" height="16" rx="2"/>
-            <circle cx="12" cy="11" r="3.5"/>
-            <circle cx="12" cy="11" r="1.2" fill="currentColor" stroke="none"/>
-            <line x1="7" y1="19" x2="7" y2="21"/>
-            <line x1="17" y1="19" x2="17" y2="21"/>
-            <line x1="16.5" y1="6.5" x2="19" y2="6.5"/>
-            <line x1="16.5" y1="9.5" x2="19" y2="9.5"/>
-          </svg>
-        </div>
-        <div class="anual-widget-label">Reserva Guardada</div>
-        <div class="anual-widget-total dourado" id="anual-reserva-total">R$ 0,00</div>
-        <div class="anual-widget-desc">Depósitos na reserva em <span id="anual-reserva-ano-label">2026</span></div>
-        <div class="anual-widget-cta">Ver detalhes →</div>
-      </div>
-
-    </div>
   </div>
 </div>
 
