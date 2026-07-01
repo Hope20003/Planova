@@ -5839,24 +5839,21 @@ function _aplicarPerfilRenda() {
   // antes, ao esticar Saldo/Gastos pra acompanhar a altura de
   // Reserva+Metas, qualquer mudança no card de metas inflava os cards
   // de previsão também, ficando desproporcional.
+  // REDESENHO (jun/2026): os 4 itens (Saldo, Gastos, Reserva, Metas) viram
+  // colunas de UM painel só (divididas por linhas finas), em vez de 2
+  // sub-painéis empilhados — por isso entram direto em #pu-grid-extra,
+  // sem os wrappers #pu-cards-principais/#pu-sidebar de antes.
   const destino = document.getElementById('pu-grid-extra');
-  if (destino && !document.getElementById('pu-cards-principais')) {
-    const principais = document.createElement('div');
-    principais.id = 'pu-cards-principais';
-    const sidebar = document.createElement('div');
-    sidebar.id = 'pu-sidebar';
-
+  if (destino && !destino.dataset.montado) {
     const saldo = document.querySelector('.previsao-card--saldo');
     const gastos = document.querySelector('.previsao-card:not(.previsao-card--saldo)');
     const reserva = document.querySelector('.reserva-card');
     const metas = document.querySelector('.metas-reserva-card-outer');
-    if (saldo) principais.appendChild(saldo);
-    if (gastos) principais.appendChild(gastos);
-    if (reserva) sidebar.appendChild(reserva);
-    if (metas) sidebar.appendChild(metas);
-
-    destino.appendChild(principais);
-    destino.appendChild(sidebar);
+    if (saldo) destino.appendChild(saldo);
+    if (gastos) destino.appendChild(gastos);
+    if (reserva) destino.appendChild(reserva);
+    if (metas) destino.appendChild(metas);
+    destino.dataset.montado = '1';
   }
 
   // Insere separadores verticais entre Residência/Cartões/Outros — sem
@@ -5890,6 +5887,13 @@ function _aplicarPerfilRenda() {
     if (linhas.length === 0 || linhas.length >= 5) return;
     const nova = linhas[linhas.length - 1].cloneNode(true);
     nova.querySelectorAll('.btn-subcategoria-linha, .btn-replicar-linha, .btn-limpar-linha').forEach(b => b.remove());
+    // O dropdown customizado de banco (.select-banco-wrap) também veio
+    // no clone, mas só visualmente — os listeners de clique foram
+    // ligados via addEventListener no select ORIGINAL e não sobrevivem
+    // ao cloneNode (mesmo motivo dos 3 botões acima). Sem isso, a caixa
+    // "Selecione" da linha nova aparece normal mas não abre ao clicar.
+    // Remove o clone quebrado e reconstrói do zero com criarSelectBanco().
+    nova.querySelectorAll('.select-banco-wrap').forEach(w => w.remove());
     const sel = nova.querySelector('select');
     const val = nova.querySelector('.val-input');
     const chk = nova.querySelector('input[type=checkbox]');
@@ -5900,7 +5904,76 @@ function _aplicarPerfilRenda() {
     delete nova._subcategoria;
     bloco.appendChild(nova);
     _inicializarLinha(nova);
+    if (sel) { delete sel._customDisplay; criarSelectBanco(sel); }
   });
+
+  // ── Alinhamento robusto do número entre "R$ X,XX" e "X,XX%" ──
+  // "R$ " só existe à esquerda do valor e "%" só existe à direita do
+  // %, então o NÚMERO em si sai do centro da própria caixa de texto
+  // em direções opostas (puxado pelo afixo que cada um tem). Centrar
+  // a caixa toda deixa os dois números desalinhados entre si; deslocar
+  // com pixels fixos (transform) depende da largura real do afixo na
+  // fonte carregada — que varia entre ambientes — e quebra fácil.
+  // Em vez disso, separa o afixo do número em spans e usa CSS Grid
+  // (1fr | número | 1fr) em ambas as linhas: a coluna do meio fica
+  // sempre centralizada de verdade, sem depender de medir nada.
+  ['p-previsao', 'p-econpct', 'p-total', 'p-gastospct'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) _envolverAfixoNumero(el);
+  });
+}
+
+// Observa um elemento de valor/% e, sempre que o texto mudar (qualquer
+// recalc, em qualquer parte do código — não precisa alterar onde o
+// valor é escrito), separa o prefixo "R$ " ou o sufixo "%" do número
+// em spans próprios. Reconcilia contra o DOM atual (não um cache do
+// último texto visto) — se outro código sobrescrever .textContent com
+// o MESMO valor em texto puro (desfazendo o wrap sem mudar a string),
+// ainda assim refaz o wrap. Desconecta o observer durante a própria
+// escrita pra não disparar loop nele mesmo.
+function _envolverAfixoNumero(el) {
+  if (el._afixoObserver) return; // já observando
+  const obs = new MutationObserver(aplicar);
+  function aplicar() {
+    const texto = el.textContent;
+    let prefixo = "", numero = texto, sufixo = "";
+    if (texto.startsWith("R$ ")) { prefixo = "R$"; numero = texto.slice(3); }
+    else if (texto.endsWith("%")) { numero = texto.slice(0, -1); sufixo = "%"; }
+    else return; // texto sem afixo conhecido (ex: "—") — não reformata
+
+    // Já está no formato esperado? Compara contra o DOM de verdade,
+    // não contra um valor cacheado — evita refazer sem necessidade,
+    // mas sem confiar que "mesmo texto" implique "já formatado".
+    const numEl = el.querySelector(":scope > .afixo-numero");
+    const temPrefixo = !!el.querySelector(":scope > .afixo-prefixo");
+    const temSufixo = !!el.querySelector(":scope > .afixo-sufixo");
+    if (numEl && numEl.textContent === numero && temPrefixo === !!prefixo && temSufixo === !!sufixo) {
+      return;
+    }
+
+    obs.disconnect();
+    el.innerHTML = "";
+    if (prefixo) {
+      const s = document.createElement("span");
+      s.className = "afixo-fixo afixo-prefixo";
+      s.textContent = prefixo;
+      el.appendChild(s);
+    }
+    const num = document.createElement("span");
+    num.className = "afixo-numero";
+    num.textContent = numero;
+    el.appendChild(num);
+    if (sufixo) {
+      const s = document.createElement("span");
+      s.className = "afixo-fixo afixo-sufixo";
+      s.textContent = sufixo;
+      el.appendChild(s);
+    }
+    obs.observe(el, { childList: true, characterData: true, subtree: true });
+  }
+  aplicar();
+  obs.observe(el, { childList: true, characterData: true, subtree: true });
+  el._afixoObserver = obs;
 }
 
 

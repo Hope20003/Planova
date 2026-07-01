@@ -470,7 +470,7 @@ body.perfil-unico .main-layout {
   display: grid !important;
   grid-template-columns: 1fr 1fr 1fr 260px;
   grid-template-rows: auto auto;
-  gap: 14px;
+  gap: 104px;
   padding: 14px 16px 24px;
   align-items: start;
 }
@@ -553,55 +553,95 @@ body.perfil-unico .painel-direita {
 #pu-grid-extra {
   display: none;
 }
-/* REDESENHO (jun/2026): em vez de "previsão ao lado de uma sidebar",
-   #pu-grid-extra agora empilha 2 painéis full-bleed — Saldo+Gastos
-   (peso alto) acima, Reserva+Meta (peso baixo) abaixo. Cada painel é
-   UM bloco único com divisória interna, não dois cards soltos — isso
-   garante que os dois lados de cada par tenham o mesmo peso visual
-   por construção (são literalmente as duas metades do mesmo painel),
-   e a hierarquia entre os pares vem da altura/tipografia do painel,
-   não de inflar o tamanho de um card pra preencher espaço. */
+/* REDESENHO (jun/2026 v2): os 4 indicadores — Saldo, Gastos, Reserva,
+   Metas — agora formam UM painel só, com divisórias finas entre as
+   colunas, em vez de 4 cards soltos ou 2 sub-painéis empilhados.
+   O motivo da v1 (empilhar 2 painéis) ter ficado errado: o card de
+   previsão foi desenhado pra uma coluna estreita de ~290px (a
+   sidebar do perfil 2 entradas) — ao esticá-lo com flex:1 pra ocupar
+   a largura total da área principal, sobrava vazio dentro dele. Aqui
+   ele não estica mais: cada coluna só herda borda/sombra/fundo do
+   painel externo (#pu-grid-extra), e o conteúdo interno mantém o
+   tamanho natural — exatamente como ele já se comporta no perfil 2
+   entradas, só que numa única fileira de 4 em vez de empilhado. */
 body.perfil-unico #pu-grid-extra {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: stretch;
   grid-column: 1 / 5;
   grid-row: 2;
-  gap: 14px;
-  width: 100%;
-  /* Mesmo respiro à direita usado em .blocos-area (linha de cima), pra
-     os painéis terminarem na mesma borda direita que o bloco "Outros". */
-  padding-right: 100px;
-  box-sizing: border-box;
-}
-
-/* ── Saldo + Gastos: dois cards de verdade, com espaço entre eles ──
-   Tentativa anterior fundia os dois num retângulo só com linha no
-   meio — visualmente lê como "card esticado e cortado", não como
-   duas coisas. Agora são dois elementos de fato, cada um com sua
-   própria borda/sombra/canto — o peso igual vem de serem estilizados
-   de forma idêntica (mesma largura via flex, mesma tipografia), não
-   de serem literalmente a mesma caixa. */
-body.perfil-unico #pu-cards-principais {
-  display: flex;
-  width: 100%;
-  gap: 16px;
-  box-sizing: border-box;
-}
-body.perfil-unico #pu-cards-principais .previsao-card {
-  flex: 1 1 0;
-  min-width: 0;
-  margin: 0 !important;
+  /* Sem margin-right aqui — a tentativa de alinhar a borda direita
+     do painel com a borda direita do bloco "Outros" (via margin-right
+     de 100px) deixava o painel visualmente descentralizado, porque
+     diferente de .blocos-area (onde esse respiro é padding INTERNO de
+     um wrapper que continua ocupando a largura cheia), aqui a margem
+     ficava fora da borda visível do card — encolhendo só o lado
+     direito. O painel agora ocupa a largura cheia da célula do grid,
+     simétrico, igual ao #coluna1-wrapper na linha de cima. */
+  background: #fff;
   border: 1.5px solid #dce6f8;
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(28,63,145,0.10);
-  padding: 24px 20px;
+  box-sizing: border-box;
+  padding: 22px 0;
+  position: relative;
+  overflow: visible;
 }
-/* Sem ::before override aqui — mantém o mesmo glow azul sutil que o
-   painel-direita do perfil 2x já usa (radial-gradient definido na
-   regra base .previsao-card::before), em vez de fundo tingido
-   verde/vermelho inventado. A mesma coloração nos dois cards, igual
-   ao 2x. */
-body.perfil-unico #pu-cards-principais .previsao-card-titulo {
+/* Mesmo glow decorativo de canto que cada .previsao-card usava —
+   agora um único, do painel inteiro, em vez de repetido por card. */
+body.perfil-unico #pu-grid-extra::before {
+  content: "";
+  position: absolute;
+  top: -18px; left: -18px;
+  width: 70px; height: 70px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(58,110,220,0.05) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Cada um dos 4 itens vira uma coluna lisa dentro do painel único —
+   sem borda/sombra/fundo próprios (isso já vem do painel), só uma
+   divisória fina entre colunas. */
+body.perfil-unico #pu-grid-extra > .previsao-card,
+body.perfil-unico #pu-grid-extra > .reserva-card,
+body.perfil-unico #pu-grid-extra > .metas-reserva-card-outer {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0 !important;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  min-height: 0;
+  padding: 0 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+body.perfil-unico #pu-grid-extra > .previsao-card::before {
+  display: none; /* o glow agora é só do painel inteiro, não por card */
+}
+body.perfil-unico #pu-grid-extra > *:not(:first-child) {
+  border-left: 1px solid #e7edf9;
+}
+body.perfil-unico #pu-grid-extra > *:first-child {
+  padding-left: 28px;
+}
+body.perfil-unico #pu-grid-extra > *:last-child {
+  padding-right: 28px;
+}
+/* Metas carrega texto + anel lado a lado — ganha um pouco mais de
+   espaço do que as outras 3 colunas, que são só número centralizado. */
+body.perfil-unico #pu-grid-extra > .metas-reserva-card-outer {
+  flex: 1.3 1 0;
+}
+
+/* ── Saldo / Gastos ── */
+body.perfil-unico #pu-grid-extra > .previsao-card {
+  align-items: center;
+  text-align: center;
+}
+body.perfil-unico #pu-grid-extra .previsao-card-titulo {
   font-size: 10.5px;
   margin-bottom: 8px;
   display: flex;
@@ -609,83 +649,100 @@ body.perfil-unico #pu-cards-principais .previsao-card-titulo {
   justify-content: center;
   gap: 6px;
 }
-/* Ícone por métrica — decorativo, mesma cor de marca (azul) nos dois,
-   sem variar por verde/vermelho — só o valor numérico (que já tem
-   essa lógica própria, intocada) carrega a cor semântica. */
-body.perfil-unico #pu-cards-principais .previsao-card-titulo::before {
-  content: "";
-  width: 13px; height: 13px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a6edc' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='4' y1='20' x2='4' y2='14'/%3E%3Cline x1='12' y1='20' x2='12' y2='9'/%3E%3Cline x1='20' y1='20' x2='20' y2='4'/%3E%3C/svg%3E") no-repeat center / contain;
+body.perfil-unico #pu-grid-extra .previsao-card-valor,
+body.perfil-unico #pu-grid-extra .previsao-card-pct {
+  font-size: 13px; /* sobrescrito abaixo por seletor mais específico pro valor */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
 }
-body.perfil-unico #pu-cards-principais .previsao-card-valor {
-  font-size: 30px;
+body.perfil-unico #pu-grid-extra .previsao-card-valor {
+  font-size: 26px;
   margin-bottom: 5px;
 }
-body.perfil-unico #pu-cards-principais .previsao-card-pct {
-  font-size: 13px;
+/* Por que grid em vez de medir e deslocar com transform: a largura de
+   "R$ " e "%" depende da fonte que está carregada de fato no
+   navegador (aqui é a 'Outfit', via @import no topo do arquivo) — um
+   px fixo calibrado num ambiente não bate em outro. Com
+   grid-template-columns: 1fr auto 1fr, a coluna do meio (o número)
+   fica SEMPRE centralizada de verdade, isolada do afixo — não importa
+   a largura de "R$ "/"%" nem a fonte realmente renderizada. afixo-fixo
+   e afixo-numero são criados via JS (_envolverAfixoNumero, chamada em
+   _aplicarPerfilRenda) a partir do mesmo texto que já existia — só
+   divide "R$ X,XX" e "X,XX%" em pedaços, sem mudar o texto exibido. */
+body.perfil-unico #pu-grid-extra .afixo-prefixo {
+  grid-column: 1;
+  justify-self: end;
+  margin-right: 0.18em;
+}
+body.perfil-unico #pu-grid-extra .afixo-numero {
+  grid-column: 2;
+}
+body.perfil-unico #pu-grid-extra .afixo-sufixo {
+  grid-column: 3;
+  justify-self: start;
+  margin-left: 0.05em;
+}
+/* Correção: o wrapper do % de Saldo (único que tem o ícone de info —
+   Gastos não tem) usa display:flex + justify-content:center no
+   próprio HTML, o que centraliza o GRUPO (texto + ícone) inteiro. Como
+   o ícone só existe de um lado, isso empurra o texto do % pra fora do
+   centro em relação ao valor acima. Em vez de brigar com o flex
+   existente, adiciona um contrapeso invisível do mesmo tamanho do
+   ícone ANTES do texto — daí centralizar o grupo [contrapeso][%][ícone]
+   centraliza o texto também, já que os dois lados ficam com a mesma
+   largura extra. */
+body.perfil-unico #pu-grid-extra .previsao-card--saldo > div:has(> .previsao-pct-info-icon)::before {
+  content: "";
+  width: 13.2px; /* mesma largura renderizada do ícone (medida via devtools) */
+  height: 1px;
+  flex-shrink: 0;
 }
 
-/* ── Reserva + Meta: mesma lógica — dois cards separados, peso visual
-   menor (cards mais baixos, números menores) por serem informação
-   secundária em relação às previsões. Sem fundo tingido — branco puro
-   igual ao painel-direita do perfil 2x. */
-body.perfil-unico #pu-sidebar {
-  display: flex;
-  width: 100%;
-  gap: 16px;
-  box-sizing: border-box;
-}
-body.perfil-unico #pu-sidebar .reserva-card,
-body.perfil-unico #pu-sidebar .metas-reserva-card-outer {
-  flex: 1 1 0;
-  min-width: 0;
-  margin: 0 !important;
-  border: 1.5px solid #dce6f8;
-  border-radius: 10px;
-  box-shadow: 0 2px 12px rgba(28,63,145,0.10);
-  min-height: 0;
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-body.perfil-unico #pu-sidebar .reserva-card {
+/* ── Reserva: sem barra/anel — não existe meta configurável pra ela,
+   só valor acumulado + ações. ── */
+body.perfil-unico #pu-grid-extra > .reserva-card {
   align-items: center;
   text-align: center;
 }
-
-/* Reserva: sem barra/anel — não existe meta configurável pra ela,
-   só valor acumulado + ações. Compacta o cabeçalho e o valor pra
-   caber no painel mais baixo. */
-body.perfil-unico #pu-sidebar .reserva-card-header {
+body.perfil-unico #pu-grid-extra .reserva-card-header {
   justify-content: center;
   gap: 8px;
   margin-bottom: 4px;
 }
-body.perfil-unico #pu-sidebar .reserva-card-titulo {
+body.perfil-unico #pu-grid-extra .reserva-card-titulo {
   font-size: 10.5px;
   display: flex;
   align-items: center;
   gap: 6px;
 }
-body.perfil-unico #pu-sidebar .reserva-card-titulo::before {
-  content: "";
-  width: 13px; height: 13px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a6edc' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2 4 5v6c0 5 3.5 8.5 8 11 4.5-2.5 8-6 8-11V5z'/%3E%3C/svg%3E") no-repeat center / contain;
-}
-body.perfil-unico #pu-sidebar .reserva-card-saldo {
-  font-size: 19px;
+body.perfil-unico #pu-grid-extra .reserva-card-saldo {
+  font-size: 22px;
   padding: 2px 0 8px;
 }
-body.perfil-unico #pu-sidebar .reserva-card-btns {
-  max-width: 230px;
+body.perfil-unico #pu-grid-extra > .reserva-card .reserva-card-btns {
+  max-width: 220px;
   width: 100%;
 }
 
-/* Meta: troca a barra linear (faz sentido pra ela, já que tem um
-   alvo) por um anel — mais direto pra "% até um valor" — e remove a
-   pilha decorativa de cards atrás (puramente visual, sem função; a
-   navegação real continua pelas setas/contador). */
+/* ── Metas: texto à esquerda (rótulo da coluna, nome da meta,
+   valores, ações), anel de progresso à direita — usa grid pra manter
+   o anel centralizado verticalmente ao lado do bloco de texto, sem
+   depender da altura dele. ── */
+body.perfil-unico #pu-grid-extra > .metas-reserva-card-outer {
+  align-items: stretch;
+  justify-content: center;
+  text-align: left;
+}
+body.perfil-unico .pu-metas-titulo {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #8a9cc8;
+  margin-bottom: 8px;
+}
 body.perfil-unico #meta-stack-s1,
 body.perfil-unico #meta-stack-s2 {
   display: none !important;
@@ -698,15 +755,17 @@ body.perfil-unico .reserva-prog-track {
 }
 body.perfil-unico .meta-ring-wrap {
   display: flex !important;
-  order: 2;
   flex-shrink: 0;
+  grid-column: 2;
+  grid-row: 1 / 4;
+  align-self: center;
 }
 body.perfil-unico .meta-card {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 16px;
+  row-gap: 6px;
   align-items: center;
-  justify-content: center;
-  gap: 8px 14px;
   border: none;
   box-shadow: none;
   background: transparent;
@@ -714,47 +773,43 @@ body.perfil-unico .meta-card {
   width: 100%;
 }
 body.perfil-unico .meta-card-header {
-  order: 1;
-  width: 100%;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 2px;
+  grid-column: 1;
+  grid-row: 1;
+  margin-bottom: 0;
 }
 body.perfil-unico .meta-card-nome {
-  font-size: 10.5px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: #8a9cc8;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-body.perfil-unico .meta-card-nome::before {
-  content: "";
-  width: 13px; height: 13px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a6edc' stroke-width='2.3'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='5'/%3E%3Ccircle cx='12' cy='12' r='1.4' fill='%233a6edc' stroke='none'/%3E%3C/svg%3E") no-repeat center / contain;
+  max-width: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 body.perfil-unico .reserva-prog-valores {
-  order: 3;
+  grid-column: 1;
+  grid-row: 2;
   margin-top: 0 !important;
+  justify-content: flex-start;
+  gap: 14px;
 }
 body.perfil-unico .reserva-prog-atual {
   font-size: 16px;
 }
-body.perfil-unico #pu-sidebar .reserva-card-btns,
 body.perfil-unico .metas-reserva-card-outer .reserva-card-btns {
-  margin-top: 8px !important;
-}
-body.perfil-unico .metas-reserva-card-outer .reserva-card-btns {
-  order: 4;
+  grid-column: 1;
+  grid-row: 3;
   width: 100%;
+  max-width: 200px;
+  margin-top: 6px !important;
+  justify-content: flex-start;
 }
-body.perfil-unico #pu-sidebar .reserva-card-btn {
+body.perfil-unico #pu-grid-extra .reserva-card-btn {
   font-size: 9.5px;
   padding: 4px 0;
 }
+body.perfil-unico #res-ativo-state > button {
+  text-align: left;
+}
 /* Estado vazio (sem meta cadastrada) — vira linha horizontal compacta
-   em vez do card vertical original, pra caber na metade do painel. */
+   em vez do card vertical original, pra caber na coluna. */
 body.perfil-unico .meta-vazio-card {
   flex-direction: row;
   align-items: center;
@@ -3557,6 +3612,15 @@ body.dark .dcal-day.hoje:not(.selecionado) { background: rgba(58,110,220,0.2); c
   position: relative;
   overflow: visible;
   min-height: 160px;
+}
+
+/* Título de coluna "Metas" — só existe pro perfil 1 entrada, onde os
+   4 indicadores (Saldo/Gastos/Reserva/Metas) vivem juntos num único
+   painel e precisam do mesmo padrão de rótulo. No perfil 2 entradas
+   essa coluna já tem identidade visual própria (pilha de cards) e
+   não precisa do rótulo extra — por isso fica oculto por padrão. */
+.pu-metas-titulo {
+  display: none;
 }
 
 .metas-outer-header {
